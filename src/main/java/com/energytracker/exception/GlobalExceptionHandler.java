@@ -23,6 +23,13 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
 	}
 
+	@ExceptionHandler(DuplicateDeviceFoundException.class)
+	public ResponseEntity<Map<String, String>> handleDuplicateDeviceFoundException(DuplicateDeviceFoundException ex, WebRequest request) {
+		Map<String, String> error = new HashMap<>();
+		error.put("error", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+	}
+
 	@ExceptionHandler(NoHandlerFoundException.class)
 	public ResponseEntity<Map<String, String>> handleNotFound(NoHandlerFoundException ex) {
 		Map<String, String> errors = new HashMap<>();
