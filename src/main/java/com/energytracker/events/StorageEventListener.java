@@ -15,15 +15,16 @@ import org.springframework.stereotype.Service;
 public class StorageEventListener {
 
 	private final ActiveStorageService activeStorageService;
+	private final ObjectMapper objectMapper;
 
 	@Autowired
-	public StorageEventListener(ActiveStorageService activeStorageService) {
+	public StorageEventListener(ActiveStorageService activeStorageService, ObjectMapper objectMapper) {
 		this.activeStorageService = activeStorageService;
+		this.objectMapper = objectMapper;
 	}
 
 	@KafkaListener(topics = "storage-events", groupId = "energy-tracker-group")
 	public void processStorageEvent(String message) throws JsonProcessingException {
-		ObjectMapper objectMapper = new ObjectMapper();
 		StorageEvent storageEvent = objectMapper.readValue(message, StorageEvent.class);
 
 		ActiveStorage activeStorage = new ActiveStorage();

@@ -15,15 +15,16 @@ import org.springframework.stereotype.Service;
 public class SmartConsumerEventListener {
 
 	private final ActiveSmartConsumerService activeSmartConsumerService;
+	private final ObjectMapper objectMapper;
 
 	@Autowired
-	public SmartConsumerEventListener(ActiveSmartConsumerService activeSmartConsumerService) {
+	public SmartConsumerEventListener(ActiveSmartConsumerService activeSmartConsumerService, ObjectMapper objectMapper) {
 		this.activeSmartConsumerService = activeSmartConsumerService;
+		this.objectMapper = objectMapper;
 	}
 
 	@KafkaListener(topics = "smartSmartConsumer-events", groupId = "energy-tracker-group")
 	public void processSmartConsumerEvent(String message) throws JsonProcessingException {
-		ObjectMapper objectMapper = new ObjectMapper();
 		SmartConsumerEvent smartSmartConsumerEvent = objectMapper.readValue(message, SmartConsumerEvent.class);
 
 		ActiveSmartConsumer activeSmartConsumer = new ActiveSmartConsumer();

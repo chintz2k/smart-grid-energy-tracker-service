@@ -15,15 +15,16 @@ import org.springframework.stereotype.Service;
 public class ProducerEventListener {
 
 	private final ActiveProducerService activeProducerService;
+	private final ObjectMapper objectMapper;
 
 	@Autowired
-	public ProducerEventListener(ActiveProducerService activeProducerService) {
+	public ProducerEventListener(ActiveProducerService activeProducerService, ObjectMapper objectMapper) {
 		this.activeProducerService = activeProducerService;
+		this.objectMapper = objectMapper;
 	}
 
 	@KafkaListener(topics = "producer-events", groupId = "energy-tracker-group")
 	public void processProducerEvent(String message) throws JsonProcessingException {
-		ObjectMapper objectMapper = new ObjectMapper();
 		ProducerEvent producerEvent = objectMapper.readValue(message, ProducerEvent.class);
 
 		ActiveProducer activeProducer = new ActiveProducer();
