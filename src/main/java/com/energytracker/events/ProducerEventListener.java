@@ -1,7 +1,9 @@
 package com.energytracker.events;
 
-import com.energytracker.entity.ActiveProducer;
-import com.energytracker.service.ActiveProducerService;
+import com.energytracker.entity.CommercialProducer;
+import com.energytracker.entity.Producer;
+import com.energytracker.service.CommercialProducerService;
+import com.energytracker.service.ProducerService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,38 +16,45 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProducerEventListener {
 
-	private final ActiveProducerService activeProducerService;
+	private final ProducerService producerService;
+	private final CommercialProducerService commercialProducerService;
 	private final ObjectMapper objectMapper;
 
 	@Autowired
-	public ProducerEventListener(ActiveProducerService activeProducerService, ObjectMapper objectMapper) {
-		this.activeProducerService = activeProducerService;
+	public ProducerEventListener(ProducerService producerService, CommercialProducerService commercialProducerService, ObjectMapper objectMapper) {
+		this.producerService = producerService;
+		this.commercialProducerService = commercialProducerService;
 		this.objectMapper = objectMapper;
 	}
 
 	@KafkaListener(topics = "producer-events", groupId = "energy-tracker-group")
 	public void processProducerEvent(String message) throws JsonProcessingException {
 		ProducerEvent producerEvent = objectMapper.readValue(message, ProducerEvent.class);
-
-		ActiveProducer activeProducer = new ActiveProducer();
-		activeProducer.setDeviceId(producerEvent.getDeviceId());
-		activeProducer.setOwnerId(producerEvent.getOwnerId());
-		activeProducer.setPowerProduction(producerEvent.getPowerProduction());
-		activeProducer.setTimestamp(producerEvent.getTimestamp());
-
-		boolean commercial = producerEvent.isCommercial();
-
-		if (producerEvent.isActive()) {
-			if (commercial) {
-				activeProducerService.addCommercial(activeProducer);
+		if (producerEvent.isCommercial()) {
+			if (producerEvent.isActive()) {
+				CommercialProducer commercialProducer = new CommercialProducer();
+				commercialProducer.setDeviceId(producerEvent.getDeviceId());
+				commercialProducer.setOwnerId(producerEvent.getOwnerId());
+				commercialProducer.setPowerProduction(producerEvent.getPowerProduction());
+				commercialProducer.setStartTime(producerEvent.getTimestamp());
+				commercialProducerService.add(commercialProducer);
 			} else {
-				activeProducerService.addPrivate(activeProducer);
+				CommercialProducer commercialProducer = commercialProducerService.getOpenDeviceByDeviceId(producerEvent.getDeviceId());
+				commercialProducer.setEndTime(producerEvent.getTimestamp());
+				commercialProducerService.update(commercialProducer);
 			}
 		} else {
-			if (commercial) {
-				activeProducerService.removeCommercial(producerEvent.getDeviceId());
+			if (producerEvent.isActive()) {
+				Producer producer = new Producer();
+				producer.setDeviceId(producerEvent.getDeviceId());
+				producer.setOwnerId(producerEvent.getOwnerId());
+				producer.setPowerProduction(producerEvent.getPowerProduction());
+				producer.setStartTime(producerEvent.getTimestamp());
+				producerService.add(producer);
 			} else {
-				activeProducerService.removePrivate(producerEvent.getDeviceId());
+				Producer producer = producerService.getOpenDeviceByDeviceId(producerEvent.getDeviceId());
+				producer.setEndTime(producerEvent.getTimestamp());
+				producerService.update(producer);
 			}
 		}
 	}

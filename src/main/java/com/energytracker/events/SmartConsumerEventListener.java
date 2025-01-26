@@ -1,7 +1,9 @@
 package com.energytracker.events;
 
-import com.energytracker.entity.ActiveSmartConsumer;
-import com.energytracker.service.ActiveSmartConsumerService;
+import com.energytracker.entity.CommercialSmartConsumer;
+import com.energytracker.entity.SmartConsumer;
+import com.energytracker.service.CommercialSmartConsumerService;
+import com.energytracker.service.SmartConsumerService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,38 +16,45 @@ import org.springframework.stereotype.Service;
 @Service
 public class SmartConsumerEventListener {
 
-	private final ActiveSmartConsumerService activeSmartConsumerService;
+	private final SmartConsumerService smartConsumerService;
+	private final CommercialSmartConsumerService commercialSmartConsumerService;
 	private final ObjectMapper objectMapper;
 
 	@Autowired
-	public SmartConsumerEventListener(ActiveSmartConsumerService activeSmartConsumerService, ObjectMapper objectMapper) {
-		this.activeSmartConsumerService = activeSmartConsumerService;
+	public SmartConsumerEventListener(SmartConsumerService smartConsumerService, CommercialSmartConsumerService commercialSmartConsumerService, ObjectMapper objectMapper) {
+		this.smartConsumerService = smartConsumerService;
+		this.commercialSmartConsumerService = commercialSmartConsumerService;
 		this.objectMapper = objectMapper;
 	}
 
-	@KafkaListener(topics = "smartSmartConsumer-events", groupId = "energy-tracker-group")
+	@KafkaListener(topics = "smart-consumer-events", groupId = "energy-tracker-group")
 	public void processSmartConsumerEvent(String message) throws JsonProcessingException {
 		SmartConsumerEvent smartSmartConsumerEvent = objectMapper.readValue(message, SmartConsumerEvent.class);
-
-		ActiveSmartConsumer activeSmartConsumer = new ActiveSmartConsumer();
-		activeSmartConsumer.setDeviceId(smartSmartConsumerEvent.getDeviceId());
-		activeSmartConsumer.setOwnerId(smartSmartConsumerEvent.getOwnerId());
-		activeSmartConsumer.setPowerConsumption(smartSmartConsumerEvent.getPowerConsumption());
-		activeSmartConsumer.setTimestamp(smartSmartConsumerEvent.getTimestamp());
-
-		boolean commercial = smartSmartConsumerEvent.isCommercial();
-
-		if (smartSmartConsumerEvent.isActive()) {
-			if (commercial) {
-				activeSmartConsumerService.addCommercial(activeSmartConsumer);
+		if (smartSmartConsumerEvent.isCommercial()) {
+			if (smartSmartConsumerEvent.isActive()) {
+				CommercialSmartConsumer commercialSmartConsumer = new CommercialSmartConsumer();
+				commercialSmartConsumer.setDeviceId(smartSmartConsumerEvent.getDeviceId());
+				commercialSmartConsumer.setOwnerId(smartSmartConsumerEvent.getOwnerId());
+				commercialSmartConsumer.setPowerConsumption(smartSmartConsumerEvent.getPowerConsumption());
+				commercialSmartConsumer.setStartTime(smartSmartConsumerEvent.getTimestamp());
+				commercialSmartConsumerService.add(commercialSmartConsumer);
 			} else {
-				activeSmartConsumerService.addPrivate(activeSmartConsumer);
+				CommercialSmartConsumer commercialSmartConsumer = commercialSmartConsumerService.getOpenDeviceByDeviceId(smartSmartConsumerEvent.getDeviceId());
+				commercialSmartConsumer.setEndTime(smartSmartConsumerEvent.getTimestamp());
+				commercialSmartConsumerService.update(commercialSmartConsumer);
 			}
 		} else {
-			if (commercial) {
-				activeSmartConsumerService.removeCommercial(smartSmartConsumerEvent.getDeviceId());
+			if (smartSmartConsumerEvent.isActive()) {
+				SmartConsumer smartConsumer = new SmartConsumer();
+				smartConsumer.setDeviceId(smartSmartConsumerEvent.getDeviceId());
+				smartConsumer.setOwnerId(smartSmartConsumerEvent.getOwnerId());
+				smartConsumer.setPowerConsumption(smartSmartConsumerEvent.getPowerConsumption());
+				smartConsumer.setStartTime(smartSmartConsumerEvent.getTimestamp());
+				smartConsumerService.add(smartConsumer);
 			} else {
-				activeSmartConsumerService.removePrivate(smartSmartConsumerEvent.getDeviceId());
+				SmartConsumer smartConsumer = smartConsumerService.getOpenDeviceByDeviceId(smartSmartConsumerEvent.getDeviceId());
+				smartConsumer.setEndTime(smartSmartConsumerEvent.getTimestamp());
+				smartConsumerService.update(smartConsumer);
 			}
 		}
 	}

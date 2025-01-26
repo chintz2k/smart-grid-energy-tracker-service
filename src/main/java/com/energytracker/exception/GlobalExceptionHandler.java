@@ -16,6 +16,20 @@ import java.util.Map;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+	@ExceptionHandler(DeviceNotFoundException.class)
+	public ResponseEntity<Map<String, String>> handleDeviceNotFoundException(DeviceNotFoundException ex, WebRequest request) {
+		Map<String, String> error = new HashMap<>();
+		error.put("error", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+	}
+
+	@ExceptionHandler(NoOpenDeviceFoundException.class)
+	public ResponseEntity<Map<String, String>> handleNoOpenDeviceFoundException(NoOpenDeviceFoundException ex, WebRequest request) {
+		Map<String, String> error = new HashMap<>();
+		error.put("error", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+	}
+
 	@ExceptionHandler(UnauthorizedAccessException.class)
 	public ResponseEntity<Map<String, String>> handleUnauthorizedAccessException(UnauthorizedAccessException ex, WebRequest request) {
 		Map<String, String> error = new HashMap<>();

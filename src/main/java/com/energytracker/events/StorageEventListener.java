@@ -1,7 +1,9 @@
 package com.energytracker.events;
 
-import com.energytracker.entity.ActiveStorage;
-import com.energytracker.service.ActiveStorageService;
+import com.energytracker.entity.CommercialStorage;
+import com.energytracker.entity.Storage;
+import com.energytracker.service.CommercialStorageService;
+import com.energytracker.service.StorageService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,41 +16,51 @@ import org.springframework.stereotype.Service;
 @Service
 public class StorageEventListener {
 
-	private final ActiveStorageService activeStorageService;
+	private final StorageService storageService;
+	private final CommercialStorageService commercialStorageService;
 	private final ObjectMapper objectMapper;
 
 	@Autowired
-	public StorageEventListener(ActiveStorageService activeStorageService, ObjectMapper objectMapper) {
-		this.activeStorageService = activeStorageService;
+	public StorageEventListener(StorageService storageService, CommercialStorageService commercialStorageService, ObjectMapper objectMapper) {
+		this.storageService = storageService;
+		this.commercialStorageService = commercialStorageService;
 		this.objectMapper = objectMapper;
 	}
 
 	@KafkaListener(topics = "storage-events", groupId = "energy-tracker-group")
 	public void processStorageEvent(String message) throws JsonProcessingException {
 		StorageEvent storageEvent = objectMapper.readValue(message, StorageEvent.class);
-
-		ActiveStorage activeStorage = new ActiveStorage();
-		activeStorage.setDeviceId(storageEvent.getDeviceId());
-		activeStorage.setOwnerId(storageEvent.getOwnerId());
-		activeStorage.setCapacity(storageEvent.getCapacity());
-		activeStorage.setCurrentCharge(storageEvent.getCurrentCharge());
-		activeStorage.setChargingPriority(storageEvent.getChargingPriority());
-		activeStorage.setConsumingPriority(storageEvent.getConsumingPriority());
-		activeStorage.setTimestamp(storageEvent.getTimestamp());
-
-		boolean commercial = storageEvent.isCommercial();
-
-		if (storageEvent.isActive()) {
-			if (commercial) {
-				activeStorageService.addCommercial(activeStorage);
+		if (storageEvent.isCommercial()) {
+			if (storageEvent.isActive()) {
+				CommercialStorage commercialStorage = new CommercialStorage();
+				commercialStorage.setDeviceId(storageEvent.getDeviceId());
+				commercialStorage.setOwnerId(storageEvent.getOwnerId());
+				commercialStorage.setCapacity(storageEvent.getCapacity());
+				commercialStorage.setCurrentCharge(storageEvent.getCurrentCharge());
+				commercialStorage.setChargingPriority(storageEvent.getChargingPriority());
+				commercialStorage.setConsumingPriority(storageEvent.getConsumingPriority());
+				commercialStorage.setStartTime(storageEvent.getTimestamp());
+				commercialStorageService.add(commercialStorage);
 			} else {
-				activeStorageService.addPrivate(activeStorage);
+				CommercialStorage commercialStorage = commercialStorageService.getOpenDeviceByDeviceId(storageEvent.getDeviceId());
+				commercialStorage.setEndTime(storageEvent.getTimestamp());
+				commercialStorageService.update(commercialStorage);
 			}
 		} else {
-			if (commercial) {
-				activeStorageService.removeCommercial(storageEvent.getDeviceId());
+			if (storageEvent.isActive()) {
+				Storage storage = new Storage();
+				storage.setDeviceId(storageEvent.getDeviceId());
+				storage.setOwnerId(storageEvent.getOwnerId());
+				storage.setCapacity(storageEvent.getCapacity());
+				storage.setCurrentCharge(storageEvent.getCurrentCharge());
+				storage.setChargingPriority(storageEvent.getChargingPriority());
+				storage.setConsumingPriority(storageEvent.getConsumingPriority());
+				storage.setStartTime(storageEvent.getTimestamp());
+				storageService.add(storage);
 			} else {
-				activeStorageService.removePrivate(storageEvent.getDeviceId());
+				Storage storage = storageService.getOpenDeviceByDeviceId(storageEvent.getDeviceId());
+				storage.setEndTime(storageEvent.getTimestamp());
+				storageService.update(storage);
 			}
 		}
 	}

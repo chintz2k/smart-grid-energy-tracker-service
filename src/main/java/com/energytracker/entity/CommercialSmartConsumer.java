@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * @author André Heinen
  */
 @Entity
-public class ActiveConsumer {
+public class CommercialSmartConsumer {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,9 +22,11 @@ public class ActiveConsumer {
 
 	private double powerConsumption;
 
-	private LocalDateTime timestamp;
+	private LocalDateTime startTime;
+	private LocalDateTime endTime = null;
+	private LocalDateTime lastUpdate = null;
 
-	public ActiveConsumer() {
+	public CommercialSmartConsumer() {
 
 	}
 
@@ -60,11 +62,27 @@ public class ActiveConsumer {
 		this.powerConsumption = powerConsumption;
 	}
 
-	public LocalDateTime getTimestamp() {
-		return timestamp;
+	public LocalDateTime getStartTime() {
+		return startTime;
 	}
 
-	public void setTimestamp(LocalDateTime timestamp) {
-		this.timestamp = timestamp;
+	public void setStartTime(LocalDateTime startTime) {
+		this.startTime = startTime;
+	}
+
+	public LocalDateTime getEndTime() {
+		return endTime;
+	}
+
+	public void setEndTime(LocalDateTime endTime) {
+		this.endTime = endTime;
+	}
+
+	public LocalDateTime getLastUpdate() {
+		return lastUpdate;
+	}
+
+	public void setLastUpdate(LocalDateTime lastUpdate) {
+		this.lastUpdate = lastUpdate;
 	}
 }
