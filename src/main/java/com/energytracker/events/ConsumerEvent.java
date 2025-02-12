@@ -1,6 +1,10 @@
 package com.energytracker.events;
 
-import java.time.LocalDateTime;
+import com.energytracker.entity.BaseConsumer;
+import com.energytracker.entity.CommercialConsumer;
+import com.energytracker.entity.Consumer;
+
+import java.time.Instant;
 
 /**
  * @author André Heinen
@@ -8,12 +12,11 @@ import java.time.LocalDateTime;
 public class ConsumerEvent {
 
 	private Long deviceId;
-	private String deviceType;
 	private Long ownerId;
 	private boolean commercial;
 	private boolean active;
 	private double powerConsumption;
-	private LocalDateTime timestamp;
+	private Instant timestamp;
 
 	public ConsumerEvent() {
 
@@ -25,14 +28,6 @@ public class ConsumerEvent {
 
 	public void setDeviceId(Long deviceId) {
 		this.deviceId = deviceId;
-	}
-
-	public String getDeviceType() {
-		return deviceType;
-	}
-
-	public void setDeviceType(String deviceType) {
-		this.deviceType = deviceType;
 	}
 
 	public Long getOwnerId() {
@@ -67,11 +62,30 @@ public class ConsumerEvent {
 		this.powerConsumption = powerConsumption;
 	}
 
-	public LocalDateTime getTimestamp() {
+	public Instant getTimestamp() {
 		return timestamp;
 	}
 
-	public void setTimestamp(LocalDateTime timestamp) {
+	public void setTimestamp(Instant timestamp) {
 		this.timestamp = timestamp;
+	}
+
+	private void populateBaseConsumerFields(BaseConsumer baseConsumer) {
+		baseConsumer.setDeviceId(deviceId);
+		baseConsumer.setOwnerId(ownerId);
+		baseConsumer.setPowerConsumption(powerConsumption);
+		baseConsumer.setStartTime(timestamp);
+	}
+
+	public Consumer toConsumer() {
+		Consumer consumer = new Consumer();
+		populateBaseConsumerFields(consumer);
+		return consumer;
+	}
+
+	public CommercialConsumer toCommercialConsumer() {
+		CommercialConsumer consumer = new CommercialConsumer();
+		populateBaseConsumerFields(consumer);
+		return consumer;
 	}
 }

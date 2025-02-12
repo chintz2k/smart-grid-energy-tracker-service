@@ -12,6 +12,4 @@ public interface CommercialStorageRepository extends JpaRepository<CommercialSto
 
 	List<CommercialStorage> findDevicesByDeviceId(Long deviceId);
 
-	void deleteByDeviceId(Long deviceId);
-
 }

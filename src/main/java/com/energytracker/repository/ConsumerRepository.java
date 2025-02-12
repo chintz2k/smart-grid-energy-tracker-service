@@ -12,6 +12,4 @@ public interface ConsumerRepository extends JpaRepository<Consumer, Long> {
 
 	List<Consumer> findDevicesByDeviceId(Long deviceId);
 
-	void deleteByDeviceId(Long deviceId);
-
 }

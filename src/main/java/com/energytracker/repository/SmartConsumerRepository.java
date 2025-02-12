@@ -12,6 +12,4 @@ public interface SmartConsumerRepository extends JpaRepository<SmartConsumer, Lo
 
 	List<SmartConsumer> findDevicesByDeviceId(Long deviceId);
 
-	void deleteByDeviceId(Long deviceId);
-
 }

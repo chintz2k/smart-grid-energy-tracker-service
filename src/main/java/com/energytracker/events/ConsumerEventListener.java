@@ -2,8 +2,7 @@ package com.energytracker.events;
 
 import com.energytracker.entity.CommercialConsumer;
 import com.energytracker.entity.Consumer;
-import com.energytracker.service.CommercialConsumerService;
-import com.energytracker.service.ConsumerService;
+import com.energytracker.service.GeneralDeviceService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,12 +15,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class ConsumerEventListener {
 
-	private final ConsumerService consumerService;
-	private final CommercialConsumerService commercialConsumerService;
+	private final GeneralDeviceService<Consumer> consumerService;
+	private final GeneralDeviceService<CommercialConsumer> commercialConsumerService;
+
 	private final ObjectMapper objectMapper;
 
 	@Autowired
-	public ConsumerEventListener(ConsumerService consumerService, CommercialConsumerService commercialConsumerService, ObjectMapper objectMapper) {
+	public ConsumerEventListener(GeneralDeviceService<Consumer> consumerService, GeneralDeviceService<CommercialConsumer> commercialConsumerService, ObjectMapper objectMapper) {
 		this.consumerService = consumerService;
 		this.commercialConsumerService = commercialConsumerService;
 		this.objectMapper = objectMapper;
@@ -32,29 +32,17 @@ public class ConsumerEventListener {
 		ConsumerEvent consumerEvent = objectMapper.readValue(message, ConsumerEvent.class);
 		if (consumerEvent.isCommercial()) {
 			if (consumerEvent.isActive()) {
-				CommercialConsumer commercialConsumer = new CommercialConsumer();
-				commercialConsumer.setDeviceId(consumerEvent.getDeviceId());
-				commercialConsumer.setOwnerId(consumerEvent.getOwnerId());
-				commercialConsumer.setPowerConsumption(consumerEvent.getPowerConsumption());
-				commercialConsumer.setStartTime(consumerEvent.getTimestamp());
+				CommercialConsumer commercialConsumer = consumerEvent.toCommercialConsumer();
 				commercialConsumerService.add(commercialConsumer);
 			} else {
-				CommercialConsumer commercialConsumer = commercialConsumerService.getOpenDeviceByDeviceId(consumerEvent.getDeviceId());
-				commercialConsumer.setEndTime(consumerEvent.getTimestamp());
-				commercialConsumerService.update(commercialConsumer);
+				commercialConsumerService.updateEndTime(consumerEvent.getDeviceId(), consumerEvent.getTimestamp());
 			}
 		} else {
 			if (consumerEvent.isActive()) {
-				Consumer consumer = new Consumer();
-				consumer.setDeviceId(consumerEvent.getDeviceId());
-				consumer.setOwnerId(consumerEvent.getOwnerId());
-				consumer.setPowerConsumption(consumerEvent.getPowerConsumption());
-				consumer.setStartTime(consumerEvent.getTimestamp());
+				Consumer consumer = consumerEvent.toConsumer();
 				consumerService.add(consumer);
 			} else {
-				Consumer consumer = consumerService.getOpenDeviceByDeviceId(consumerEvent.getDeviceId());
-				consumer.setEndTime(consumerEvent.getTimestamp());
-				consumerService.update(consumer);
+				consumerService.updateEndTime(consumerEvent.getDeviceId(), consumerEvent.getTimestamp());
 			}
 		}
 	}

@@ -12,6 +12,4 @@ public interface CommercialSmartConsumerRepository extends JpaRepository<Commerc
 
 	List<CommercialSmartConsumer> findDevicesByDeviceId(Long deviceId);
 
-	void deleteByDeviceId(Long deviceId);
-
 }

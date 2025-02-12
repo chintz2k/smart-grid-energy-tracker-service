@@ -12,6 +12,4 @@ public interface StorageRepository extends JpaRepository<Storage, Long> {
 
 	List<Storage> findDevicesByDeviceId(Long deviceId);
 
-	void deleteByDeviceId(Long deviceId);
-
 }

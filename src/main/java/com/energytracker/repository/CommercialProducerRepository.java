@@ -12,6 +12,4 @@ public interface CommercialProducerRepository extends JpaRepository<CommercialPr
 
 	List<CommercialProducer> findDevicesByDeviceId(Long deviceId);
 
-	void deleteByDeviceId(Long deviceId);
-
 }

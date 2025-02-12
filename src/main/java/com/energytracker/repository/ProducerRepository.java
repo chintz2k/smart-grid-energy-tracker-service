@@ -12,6 +12,4 @@ public interface ProducerRepository extends JpaRepository<Producer, Long> {
 
 	List<Producer> findDevicesByDeviceId(Long deviceId);
 
-	void deleteByDeviceId(Long deviceId);
-
 }

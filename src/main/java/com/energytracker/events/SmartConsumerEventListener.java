@@ -2,8 +2,7 @@ package com.energytracker.events;
 
 import com.energytracker.entity.CommercialSmartConsumer;
 import com.energytracker.entity.SmartConsumer;
-import com.energytracker.service.CommercialSmartConsumerService;
-import com.energytracker.service.SmartConsumerService;
+import com.energytracker.service.GeneralDeviceService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,12 +15,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class SmartConsumerEventListener {
 
-	private final SmartConsumerService smartConsumerService;
-	private final CommercialSmartConsumerService commercialSmartConsumerService;
+	private final GeneralDeviceService<SmartConsumer> smartConsumerService;
+	private final GeneralDeviceService<CommercialSmartConsumer> commercialSmartConsumerService;
+
 	private final ObjectMapper objectMapper;
 
 	@Autowired
-	public SmartConsumerEventListener(SmartConsumerService smartConsumerService, CommercialSmartConsumerService commercialSmartConsumerService, ObjectMapper objectMapper) {
+	public SmartConsumerEventListener(GeneralDeviceService<SmartConsumer> smartConsumerService, GeneralDeviceService<CommercialSmartConsumer> commercialSmartConsumerService, ObjectMapper objectMapper) {
 		this.smartConsumerService = smartConsumerService;
 		this.commercialSmartConsumerService = commercialSmartConsumerService;
 		this.objectMapper = objectMapper;
@@ -29,32 +29,20 @@ public class SmartConsumerEventListener {
 
 	@KafkaListener(topics = "smart-consumer-events", groupId = "energy-tracker-group")
 	public void processSmartConsumerEvent(String message) throws JsonProcessingException {
-		SmartConsumerEvent smartSmartConsumerEvent = objectMapper.readValue(message, SmartConsumerEvent.class);
-		if (smartSmartConsumerEvent.isCommercial()) {
-			if (smartSmartConsumerEvent.isActive()) {
-				CommercialSmartConsumer commercialSmartConsumer = new CommercialSmartConsumer();
-				commercialSmartConsumer.setDeviceId(smartSmartConsumerEvent.getDeviceId());
-				commercialSmartConsumer.setOwnerId(smartSmartConsumerEvent.getOwnerId());
-				commercialSmartConsumer.setPowerConsumption(smartSmartConsumerEvent.getPowerConsumption());
-				commercialSmartConsumer.setStartTime(smartSmartConsumerEvent.getTimestamp());
+		SmartConsumerEvent smartConsumerEvent = objectMapper.readValue(message, SmartConsumerEvent.class);
+		if (smartConsumerEvent.isCommercial()) {
+			if (smartConsumerEvent.isActive()) {
+				CommercialSmartConsumer commercialSmartConsumer = smartConsumerEvent.toCommercialSmartConsumer();
 				commercialSmartConsumerService.add(commercialSmartConsumer);
 			} else {
-				CommercialSmartConsumer commercialSmartConsumer = commercialSmartConsumerService.getOpenDeviceByDeviceId(smartSmartConsumerEvent.getDeviceId());
-				commercialSmartConsumer.setEndTime(smartSmartConsumerEvent.getTimestamp());
-				commercialSmartConsumerService.update(commercialSmartConsumer);
+				commercialSmartConsumerService.updateEndTime(smartConsumerEvent.getDeviceId(), smartConsumerEvent.getTimestamp());
 			}
 		} else {
-			if (smartSmartConsumerEvent.isActive()) {
-				SmartConsumer smartConsumer = new SmartConsumer();
-				smartConsumer.setDeviceId(smartSmartConsumerEvent.getDeviceId());
-				smartConsumer.setOwnerId(smartSmartConsumerEvent.getOwnerId());
-				smartConsumer.setPowerConsumption(smartSmartConsumerEvent.getPowerConsumption());
-				smartConsumer.setStartTime(smartSmartConsumerEvent.getTimestamp());
+			if (smartConsumerEvent.isActive()) {
+				SmartConsumer smartConsumer = smartConsumerEvent.toSmartConsumer();
 				smartConsumerService.add(smartConsumer);
 			} else {
-				SmartConsumer smartConsumer = smartConsumerService.getOpenDeviceByDeviceId(smartSmartConsumerEvent.getDeviceId());
-				smartConsumer.setEndTime(smartSmartConsumerEvent.getTimestamp());
-				smartConsumerService.update(smartConsumer);
+				smartConsumerService.updateEndTime(smartConsumerEvent.getDeviceId(), smartConsumerEvent.getTimestamp());
 			}
 		}
 	}

@@ -1,6 +1,10 @@
 package com.energytracker.events;
 
-import java.time.LocalDateTime;
+import com.energytracker.entity.BaseStorage;
+import com.energytracker.entity.CommercialStorage;
+import com.energytracker.entity.Storage;
+
+import java.time.Instant;
 
 /**
  * @author André Heinen
@@ -8,7 +12,6 @@ import java.time.LocalDateTime;
 public class StorageEvent {
 
 	private Long deviceId;
-	private String deviceType;
 	private Long ownerId;
 	private boolean commercial;
 	private boolean active;
@@ -16,7 +19,7 @@ public class StorageEvent {
 	private double currentCharge;
 	private int chargingPriority;
 	private int consumingPriority;
-	private LocalDateTime timestamp;
+	private Instant timestamp;
 
 	public StorageEvent() {
 
@@ -28,14 +31,6 @@ public class StorageEvent {
 
 	public void setDeviceId(Long deviceId) {
 		this.deviceId = deviceId;
-	}
-
-	public String getDeviceType() {
-		return deviceType;
-	}
-
-	public void setDeviceType(String deviceType) {
-		this.deviceType = deviceType;
 	}
 
 	public Long getOwnerId() {
@@ -94,11 +89,33 @@ public class StorageEvent {
 		this.consumingPriority = consumingPriority;
 	}
 
-	public LocalDateTime getTimestamp() {
+	public Instant getTimestamp() {
 		return timestamp;
 	}
 
-	public void setTimestamp(LocalDateTime timestamp) {
+	public void setTimestamp(Instant timestamp) {
 		this.timestamp = timestamp;
+	}
+
+	private void populateBaseStorageFields(BaseStorage baseStorage) {
+		baseStorage.setDeviceId(deviceId);
+		baseStorage.setOwnerId(ownerId);
+		baseStorage.setCapacity(capacity);
+		baseStorage.setCurrentCharge(currentCharge);
+		baseStorage.setChargingPriority(chargingPriority);
+		baseStorage.setConsumingPriority(consumingPriority);
+		baseStorage.setStartTime(timestamp);
+	}
+
+	public Storage toStorage() {
+		Storage storage = new Storage();
+		populateBaseStorageFields(storage);
+		return storage;
+	}
+
+	public CommercialStorage toCommercialStorage() {
+		CommercialStorage storage = new CommercialStorage();
+		populateBaseStorageFields(storage);
+		return storage;
 	}
 }
