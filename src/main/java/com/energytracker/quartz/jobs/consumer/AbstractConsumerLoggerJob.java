@@ -21,11 +21,11 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * @author André Heinen
  */
-public abstract class AbstractLoggerJob<T extends BaseConsumer> implements Job {
+public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implements Job {
 
 	private final InfluxDBService influxDBService;
 
-	protected AbstractLoggerJob(InfluxDBService influxDBService) {
+	protected AbstractConsumerLoggerJob(InfluxDBService influxDBService) {
 		this.influxDBService = influxDBService;
 	}
 

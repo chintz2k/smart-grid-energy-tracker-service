@@ -13,7 +13,7 @@ import java.util.List;
  * @author André Heinen
  */
 @Component
-public class CommercialSmartConsumerLoggerJob extends AbstractLoggerJob<CommercialSmartConsumer> {
+public class CommercialSmartConsumerLoggerJob extends AbstractConsumerLoggerJob<CommercialSmartConsumer> {
 
 	private final GeneralDeviceService<CommercialSmartConsumer> commercialSmartConsumerService;
 

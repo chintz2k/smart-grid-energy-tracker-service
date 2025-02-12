@@ -2,6 +2,8 @@ package com.energytracker.quartz;
 
 import com.energytracker.quartz.jobs.consumer.CommercialConsumerLoggerJob;
 import com.energytracker.quartz.jobs.consumer.CommercialSmartConsumerLoggerJob;
+import com.energytracker.quartz.jobs.consumer.ConsumerLoggerJob;
+import com.energytracker.quartz.jobs.consumer.SmartConsumerLoggerJob;
 import org.quartz.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,7 +27,7 @@ public class QuartzJobScheduler {
 		return TriggerBuilder.newTrigger()
 				.forJob(commercialConsumerLoggerJobDetail())
 				.withIdentity("commercialConsumerLoggerJobTrigger", "ConsumptionJobs")
-				.withSchedule(CronScheduleBuilder.cronSchedule(QuartzIntervals.CONSUMER_CRON_JOB))
+				.withSchedule(CronScheduleBuilder.cronSchedule(QuartzIntervals.COMMERCIAL_CONSUMER_CRON_JOB))
 				.build();
 	}
 
@@ -42,6 +44,40 @@ public class QuartzJobScheduler {
 		return TriggerBuilder.newTrigger()
 				.forJob(commercialSmartConsumerLoggerJobDetail())
 				.withIdentity("commercialSmartConsumerLoggerJobTrigger", "ConsumptionJobs")
+				.withSchedule(CronScheduleBuilder.cronSchedule(QuartzIntervals.COMMERCIAL_SMART_CONSUMER_CRON_JOB))
+				.build();
+	}
+
+	@Bean
+	public JobDetail ConsumerLoggerJobDetail() {
+		return JobBuilder.newJob(ConsumerLoggerJob.class)
+				.withIdentity("ConsumerLoggerJob", "ConsumptionJobs")
+				.storeDurably()
+				.build();
+	}
+
+	@Bean
+	public Trigger ConsumerJobTrigger() {
+		return TriggerBuilder.newTrigger()
+				.forJob(ConsumerLoggerJobDetail())
+				.withIdentity("ConsumerLoggerJobTrigger", "ConsumptionJobs")
+				.withSchedule(CronScheduleBuilder.cronSchedule(QuartzIntervals.CONSUMER_CRON_JOB))
+				.build();
+	}
+
+	@Bean
+	public JobDetail SmartConsumerLoggerJobDetail() {
+		return JobBuilder.newJob(SmartConsumerLoggerJob.class)
+				.withIdentity("SmartConsumerLoggerJob", "ConsumptionJobs")
+				.storeDurably()
+				.build();
+	}
+
+	@Bean
+	public Trigger SmartConsumerJobTrigger() {
+		return TriggerBuilder.newTrigger()
+				.forJob(SmartConsumerLoggerJobDetail())
+				.withIdentity("SmartConsumerLoggerJobTrigger", "ConsumptionJobs")
 				.withSchedule(CronScheduleBuilder.cronSchedule(QuartzIntervals.SMART_CONSUMER_CRON_JOB))
 				.build();
 	}

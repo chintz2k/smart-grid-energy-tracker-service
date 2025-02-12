@@ -30,17 +30,7 @@ public class InfluxDBService {
 		}
 		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
 		if (measurementName != null) {
-			if (measurementName.equals("commercial_consumer_consumption")) {
-				measurements.forEach(measurement -> {
-					writeApi.writePoint("energy_tracker", "chintz_de", createConsumptionMeasurementPoint(measurement, measurementName));
-					writeApi.writePoint("energy_tracker", "chintz_de", createConsumptionMeasurementPoint(measurement, "overall_consumption"));
-				});
-			} else if (measurementName.equals("commercial_smart_consumer_consumption")) {
-				measurements.forEach(measurement -> {
-					writeApi.writePoint("energy_tracker", "chintz_de", createConsumptionMeasurementPoint(measurement, measurementName));
-					writeApi.writePoint("energy_tracker", "chintz_de", createConsumptionMeasurementPoint(measurement, "overall_consumption"));
-				});
-			}
+			measurements.forEach(measurement -> writeApi.writePoint("energy_tracker", "chintz_de", createConsumptionMeasurementPoint(measurement, measurementName)));
 		}
 	}
 
