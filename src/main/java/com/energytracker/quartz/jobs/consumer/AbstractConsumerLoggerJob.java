@@ -3,28 +3,31 @@ package com.energytracker.quartz.jobs.consumer;
 import com.energytracker.entity.*;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.influx.measurements.ConsumptionMeasurement;
+import com.energytracker.quartz.util.MeasurementLogger;
 import org.jetbrains.annotations.Nullable;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author André Heinen
  */
+@Component
 public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implements Job {
 
 	private final InfluxDBService influxDBService;
 
+	@Autowired
 	protected AbstractConsumerLoggerJob(InfluxDBService influxDBService) {
 		this.influxDBService = influxDBService;
 	}
@@ -37,7 +40,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	protected abstract void removeAll(List<T> consumerList);
 	protected abstract int getIntervalInSeconds();
 
-	private final Map<Instant, String> news = new ConcurrentHashMap<>();
+	private final MeasurementLogger measurementLogger = new MeasurementLogger();
 
 	@Override
 	@Async("taskExecutor")
@@ -51,7 +54,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 
 		updateDatabase(updatedConsumers, removedConsumers, measurementsBatch);
 
-		printNews();
+		measurementLogger.printAllEntries();
 	}
 
 	private void processSynced(List<T> activeConsumers, List<ConsumptionMeasurement> measurementsBatch, List<T> updatedConsumers, List<T> removedConsumers) {
@@ -92,7 +95,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		}
 
 		if (!measurementsBatch.isEmpty()) {
-			influxDBService.saveMeasurements(measurementsBatch, getMeasurementName());
+			influxDBService.saveConsumptionMeasurements(measurementsBatch, getMeasurementName());
 		}
 	}
 
@@ -124,7 +127,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			// Verbrauchsdaten für wiederholte Intervalle verarbeiten
 			prev = processIntervals(consumer, prev, intervalStart, endTime, measurementsBatch);
 
-			// Letztes Intervall und Abschlussverarbeitung falls nötig
+			// Letztes Intervall und Abschlussverarbeitung, falls nötig
 			if (canFinish) {
 				processEndPeriod(consumer, prev, measurementsBatch, removedConsumers);
 			}
@@ -167,7 +170,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			// Verbrauch initialisieren, wenn das Gerät gerade eingeschaltet wurde
 			ConsumptionMeasurement zeroMeasurement = createZeroMeasurementAtStart(consumer);
 			measurementsBatch.add(zeroMeasurement);
-			addNews(zeroMeasurement.getTimestamp(), String.format("Gerät angeschaltet. %.1f kWh für den Start gesetzt.", zeroMeasurement.getConsumption()));
+			measurementLogger.addEntry(zeroMeasurement.getTimestamp(), String.format("Gerät angeschaltet. %.1f kWh für den Start gesetzt.", zeroMeasurement.getConsumption()));
 
 			Instant alignedStart = startTime.minusSeconds(startTime.getEpochSecond() % getIntervalInSeconds())
 					.truncatedTo(ChronoUnit.SECONDS)
@@ -188,7 +191,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 
 		ConsumptionMeasurement measurement = createMeasurement(consumer, endTime, consumption);
 		measurementsBatch.add(measurement);
-		addNews(measurement.getTimestamp(), String.format(
+		measurementLogger.addEntry(measurement.getTimestamp(), String.format(
 				"Gerät ausgeschaltet. Nur ein Intervall mit %d ms. Verbrauch: %.6f kWh.",
 				elapsedTime, measurement.getConsumption()));
 	}
@@ -208,7 +211,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			ConsumptionMeasurement measurement = createMeasurement(consumer, intervalStart, consumption);
 			measurementsBatch.add(measurement);
 
-			addNews(measurement.getTimestamp(), String.format(
+			measurementLogger.addEntry(measurement.getTimestamp(), String.format(
 					"Intervall von %d ms erfasst. Verbrauch: %.6f kWh.",
 					elapsedTime, consumption));
 
@@ -232,7 +235,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			ConsumptionMeasurement lastMeasurement = createMeasurement(consumer, consumer.getEndTime(), consumption);
 			measurementsBatch.add(lastMeasurement);
 
-			addNews(lastMeasurement.getTimestamp(), String.format(
+			measurementLogger.addEntry(lastMeasurement.getTimestamp(), String.format(
 					"Gerät wurde ausgeschaltet. Letztes Intervall von %d ms erfasst. Verbrauch: %.6f kWh.",
 					lastIntervalElapsed, lastMeasurement.getConsumption()));
 		}
@@ -242,7 +245,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		measurementsBatch.add(zeroMeasurement);
 		removedConsumers.add(consumer);
 
-		addNews(zeroMeasurement.getTimestamp(), String.format(
+		measurementLogger.addEntry(zeroMeasurement.getTimestamp(), String.format(
 				"Gerät ist ausgeschaltet. %.1f kWh für das Ende gesetzt.",
 				zeroMeasurement.getConsumption()));
 	}
@@ -299,36 +302,5 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		measurement.setOwnerId(consumer.getOwnerId());
 		measurement.setConsumption(consumption);
 		return measurement;
-	}
-
-	private void addNews(Instant timestamp, String message) {
-		news.put(timestamp, message);
-	}
-
-	private String getNews() {
-		if (!news.isEmpty()) {
-			StringBuilder sortedNews = new StringBuilder();
-
-			news.entrySet().stream()
-					.sorted(Map.Entry.comparingByKey())
-					.forEach(entry -> sortedNews.append(entry.getKey())
-							.append(" - ")
-							.append(entry.getValue())
-							.append("\n")
-					);
-
-			if (!sortedNews.isEmpty() && sortedNews.charAt(sortedNews.length() - 1) == '\n') {
-				sortedNews.setLength(sortedNews.length() - 1);
-			}
-
-			return sortedNews.toString();
-		}
-		return null;
-	}
-
-	private void printNews() {
-		if (getNews() != null) {
-			System.out.println(getNews());
-		}
 	}
 }
