@@ -2,10 +2,12 @@ package com.energytracker.webclients;
 
 import com.energytracker.dto.WeatherResponse;
 import com.energytracker.security.TokenService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestTemplate;
 
 /**
  * @author André Heinen
@@ -13,29 +15,35 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Service
 public class WeatherApiClient {
 
-	private final WebClient webClient;
-
+	private final RestTemplate restTemplate;
 	private final TokenService tokenService;
 
-	@Autowired
-	public WeatherApiClient(
-			@Qualifier("loadBalancedWebClientBuilder") WebClient.Builder builder,
-			WebClientAuthenticationFilter authenticationFilter,
-			TokenService tokenService
-	) {
+	public WeatherApiClient(RestTemplate restTemplate, TokenService tokenService) {
+		this.restTemplate = restTemplate;
 		this.tokenService = tokenService;
-		this.webClient = builder
-				.filter(authenticationFilter.authenticationFilter())
-				.baseUrl("http://weather-api")
-				.build();
 	}
 
+	// Abrufen von Wetterdaten über Registry-Service (Eureka)
 	public WeatherResponse getWeather() {
-		return webClient.get()
-				.uri("/weather")
-				.header("Authorization", "Bearer " + tokenService.getAccessToken())
-				.retrieve()
-				.bodyToMono(WeatherResponse.class)
-				.block();
+		String url = "http://weather-api/weather"; // Der Service-Name, nicht die IP/Port
+		String accessToken = tokenService.getAccessToken();
+
+		// Authorization Header mit dem Token als Bearer setzen
+		HttpHeaders headers = new HttpHeaders();
+		headers.setBearerAuth(accessToken);
+
+		// HttpEntity mit Header erstellen
+		HttpEntity<?> entity = new HttpEntity<>(headers);
+
+		// Anfrage mit restTemplate und Authorization Header senden
+		ResponseEntity<WeatherResponse> response = restTemplate.exchange(
+				url,
+				HttpMethod.GET,
+				entity,
+				WeatherResponse.class
+		);
+
+		return response.getBody(); // Körper der Antwort zurückgeben
 	}
+
 }

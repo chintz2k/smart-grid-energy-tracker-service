@@ -64,6 +64,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			sunPowerModificator = response.getSolarPower();
 			windPowerModificator = response.getWindPower();
 		}
+		System.out.println(sunPowerModificator + " / " + windPowerModificator);
 
 		processASync(activeProducers, measurementsBatch, updatedProducers, removedProducers);
 
@@ -217,7 +218,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		ProductionMeasurement measurement = createMeasurement(producer, endTime, production);
 		measurementsBatch.add(measurement);
 		measurementLogger.addEntry(measurement.getTimestamp(), String.format(
-				"Gerät ausgeschaltet. Nur ein Intervall mit %d ms. Verbrauch: %.6f kWh.",
+				"Gerät ausgeschaltet. Nur ein Intervall mit %d ms. Erzeugung: %.6f kWh.",
 				elapsedTime, measurement.getProduction()));
 	}
 
@@ -237,7 +238,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			measurementsBatch.add(measurement);
 
 			measurementLogger.addEntry(measurement.getTimestamp(), String.format(
-					"Intervall von %d ms erfasst. Verbrauch: %.6f kWh.",
+					"Intervall von %d ms erfasst. Erzeugung: %.6f kWh.",
 					elapsedTime, production));
 
 			prev = intervalStart;
@@ -261,7 +262,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			measurementsBatch.add(lastMeasurement);
 
 			measurementLogger.addEntry(lastMeasurement.getTimestamp(), String.format(
-					"Gerät wurde ausgeschaltet. Letztes Intervall von %d ms erfasst. Verbrauch: %.6f kWh.",
+					"Gerät wurde ausgeschaltet. Letztes Intervall von %d ms erfasst. Erzeugung: %.6f kWh.",
 					lastIntervalElapsed, lastMeasurement.getProduction()));
 		}
 
@@ -306,6 +307,8 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		measurement.setTimestamp(startTime);
 		measurement.setDeviceId(producer.getDeviceId());
 		measurement.setOwnerId(producer.getOwnerId());
+		measurement.setPowerType(producer.getPowerType());
+		measurement.setRenewable(producer.isRenewable());
 		measurement.setProduction(0.0);
 		return measurement;
 	}
@@ -317,6 +320,8 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		measurement.setTimestamp(endTime);
 		measurement.setDeviceId(producer.getDeviceId());
 		measurement.setOwnerId(producer.getOwnerId());
+		measurement.setPowerType(producer.getPowerType());
+		measurement.setRenewable(producer.isRenewable());
 		measurement.setProduction(0.0);
 		return measurement;
 	}
@@ -327,6 +332,8 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		measurement.setTimestamp(timestamp);
 		measurement.setDeviceId(producer.getDeviceId());
 		measurement.setOwnerId(producer.getOwnerId());
+		measurement.setPowerType(producer.getPowerType());
+		measurement.setRenewable(producer.isRenewable());
 		measurement.setProduction(production);
 		return measurement;
 	}

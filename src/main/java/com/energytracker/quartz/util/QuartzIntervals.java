@@ -1,4 +1,4 @@
-package com.energytracker.quartz;
+package com.energytracker.quartz.util;
 
 import org.springframework.context.annotation.Configuration;
 

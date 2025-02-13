@@ -2,7 +2,7 @@ package com.energytracker.quartz.jobs.consumer;
 
 import com.energytracker.entity.Consumer;
 import com.energytracker.influx.InfluxDBService;
-import com.energytracker.quartz.QuartzIntervals;
+import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.service.GeneralDeviceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

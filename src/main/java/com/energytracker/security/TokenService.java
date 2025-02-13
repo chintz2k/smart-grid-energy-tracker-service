@@ -6,7 +6,9 @@ import com.energytracker.dto.TokenRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Date;
 
 /**
  * @author André Heinen
@@ -14,52 +16,71 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Service
 public class TokenService {
 
-	private final WebClient webClient;
+	private final RestTemplate restTemplate;
+	private final JwtUtil jwtUtil;
 
 	private String accessToken;
 	private String refreshToken;
 
-	private final Object lock = new Object();
-
 	@Autowired
-	public TokenService(@Qualifier("loadBalancedWebClientBuilder") WebClient.Builder builder) {
-		this.webClient = builder.baseUrl("http://registry-service").build();
+	public TokenService(@Qualifier("loadBalancedRestTemplate") RestTemplate restTemplate, JwtUtil jwtUtil) {
+		this.restTemplate = restTemplate;
+		this.jwtUtil = jwtUtil;
 	}
 
-	public String getAccessToken() {
-		if (accessToken == null) {
-			authenticate();
+	public synchronized String getAccessToken() {
+		if (accessToken == null || isTokenExpired(accessToken)) {
+			if (refreshToken != null) {
+				refreshAccessToken();
+			} else {
+				authenticate();
+			}
 		}
 		return accessToken;
 	}
 
 	private void authenticate() {
 		AuthenticationRequest request = new AuthenticationRequest("john@example.com", "12345");
-		AuthenticationResponse response = webClient.post()
-				.uri("/login")
-				.bodyValue(request)
-				.retrieve()
-				.bodyToMono(AuthenticationResponse.class)
-				.block();
 
-		assert response != null;
+		AuthenticationResponse response = restTemplate.postForObject(
+				"http://registry-service/login", // Service-Name des Authentifizierungsservices
+				request,
+				AuthenticationResponse.class
+		);
+
+		if (response == null || response.accessToken() == null || response.refreshToken() == null) {
+			throw new IllegalStateException("Authentication failed");
+		}
+
 		this.accessToken = response.accessToken();
 		this.refreshToken = response.refreshToken();
 	}
 
-	public void refreshAccessToken() {
-		synchronized (lock) {
-			TokenRequest request = new TokenRequest(this.refreshToken);
-			AuthenticationResponse response = webClient.post()
-					.uri("/refresh")
-					.bodyValue(request)
-					.retrieve()
-					.bodyToMono(AuthenticationResponse.class)
-					.block();
+	public synchronized void refreshAccessToken() {
+		TokenRequest request = new TokenRequest(this.refreshToken);
 
-			assert response != null;
-			this.accessToken = response.accessToken();
-			this.refreshToken = response.refreshToken();
+		AuthenticationResponse response = restTemplate.postForObject(
+				"http://registry-service/refresh", // Auch hier Service-Name
+				request,
+				AuthenticationResponse.class
+		);
+
+		if (response == null || response.accessToken() == null || response.refreshToken() == null) {
+			throw new IllegalStateException("Token refresh failed");
+		}
+
+		this.accessToken = response.accessToken();
+		this.refreshToken = response.refreshToken();
+	}
+
+	private boolean isTokenExpired(String token) {
+		try {
+			return jwtUtil.getClaimsFromToken(token)
+					.getExpiration()
+					.before(new Date());
+		} catch (Exception e) {
+			return true;
 		}
 	}
+
 }

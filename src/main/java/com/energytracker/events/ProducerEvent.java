@@ -15,9 +15,9 @@ public class ProducerEvent {
 	private Long ownerId;
 	private boolean commercial;
 	private boolean active;
-	private double powerProduction;
 	private String powerType;
 	private boolean renewable;
+	private double powerProduction;
 	private Instant timestamp;
 
 	public ProducerEvent() {
@@ -56,14 +56,6 @@ public class ProducerEvent {
 		this.active = active;
 	}
 
-	public double getPowerProduction() {
-		return powerProduction;
-	}
-
-	public void setPowerProduction(double powerProduction) {
-		this.powerProduction = powerProduction;
-	}
-
 	public String getPowerType() {
 		return powerType;
 	}
@@ -78,6 +70,14 @@ public class ProducerEvent {
 
 	public void setRenewable(boolean renewable) {
 		this.renewable = renewable;
+	}
+
+	public double getPowerProduction() {
+		return powerProduction;
+	}
+
+	public void setPowerProduction(double powerProduction) {
+		this.powerProduction = powerProduction;
 	}
 
 	public Instant getTimestamp() {

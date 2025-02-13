@@ -4,6 +4,7 @@ import com.energytracker.quartz.jobs.consumer.CommercialConsumerLoggerJob;
 import com.energytracker.quartz.jobs.consumer.CommercialSmartConsumerLoggerJob;
 import com.energytracker.quartz.jobs.consumer.ConsumerLoggerJob;
 import com.energytracker.quartz.jobs.consumer.SmartConsumerLoggerJob;
+import com.energytracker.quartz.util.QuartzIntervals;
 import org.quartz.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
  * @author André Heinen
  */
 @Configuration
-public class QuartzJobScheduler {
+public class ConsumerJobScheduler {
 
 	@Bean
 	public JobDetail commercialConsumerLoggerJobDetail() {
