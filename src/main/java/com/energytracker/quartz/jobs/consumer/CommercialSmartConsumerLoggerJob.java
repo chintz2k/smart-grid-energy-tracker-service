@@ -1,6 +1,8 @@
 package com.energytracker.quartz.jobs.consumer;
 
 import com.energytracker.entity.CommercialSmartConsumer;
+import com.energytracker.entity.CommercialStorage;
+import com.energytracker.entity.Storage;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.service.GeneralDeviceService;
@@ -18,8 +20,8 @@ public class CommercialSmartConsumerLoggerJob extends AbstractConsumerLoggerJob<
 	private final GeneralDeviceService<CommercialSmartConsumer> commercialSmartConsumerService;
 
 	@Autowired
-	public CommercialSmartConsumerLoggerJob(InfluxDBService influxDBService, GeneralDeviceService<CommercialSmartConsumer> commercialSmartConsumerService) {
-		super(influxDBService);
+	public CommercialSmartConsumerLoggerJob(InfluxDBService influxDBService, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService, GeneralDeviceService<CommercialSmartConsumer> commercialSmartConsumerService) {
+		super(influxDBService, commercialStorageService, storageService);
 		this.commercialSmartConsumerService = commercialSmartConsumerService;
 	}
 

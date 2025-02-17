@@ -76,8 +76,8 @@ public abstract class GeneralDeviceServiceImpl<T extends BaseDevice, R extends J
 	public void updateEndTime(Long deviceId, Instant endTime) {
 		T device = getOpenDeviceByDeviceId(deviceId);
 		if (device != null) {
-			device.setEndTime(endTime);
-			repository.save(device);
+//			device.setEndTime(endTime);
+			repository.delete(device);
 		}
 	}
 }

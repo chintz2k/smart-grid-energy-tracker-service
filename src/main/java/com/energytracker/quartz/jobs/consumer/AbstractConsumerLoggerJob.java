@@ -3,11 +3,14 @@ package com.energytracker.quartz.jobs.consumer;
 import com.energytracker.entity.*;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.influx.measurements.ConsumptionMeasurement;
-import com.energytracker.quartz.util.MeasurementLogger;
+import com.energytracker.influx.measurements.StorageMeasurement;
+import com.energytracker.service.GeneralDeviceService;
 import org.jetbrains.annotations.Nullable;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -17,7 +20,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 /**
  * @author André Heinen
@@ -25,22 +30,27 @@ import java.util.concurrent.CompletableFuture;
 @Component
 public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implements Job {
 
-	private final InfluxDBService influxDBService;
+	private static final Logger logger = LoggerFactory.getLogger(AbstractConsumerLoggerJob.class);
 
-	@Autowired
-	protected AbstractConsumerLoggerJob(InfluxDBService influxDBService) {
-		this.influxDBService = influxDBService;
-	}
+	private static final int BATCH_SIZE = 500;
+
+	private final InfluxDBService influxDBService;
+	private final GeneralDeviceService<CommercialStorage> commercialStorageService;
+	private final GeneralDeviceService<Storage> storageService;
 
 	protected abstract List<T> getActiveConsumers();
 	protected abstract T getConsumerById(Long id);
 	protected abstract String getMeasurementName();
-
 	protected abstract void updateAll(List<T> consumerList);
 	protected abstract void removeAll(List<T> consumerList);
 	protected abstract int getIntervalInSeconds();
 
-	private final MeasurementLogger measurementLogger = new MeasurementLogger();
+	@Autowired
+	public AbstractConsumerLoggerJob(InfluxDBService influxDBService, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService) {
+		this.influxDBService = influxDBService;
+		this.commercialStorageService = commercialStorageService;
+		this.storageService = storageService;
+	}
 
 	@Override
 	@Async("taskExecutor")
@@ -49,43 +59,144 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		List<ConsumptionMeasurement> measurementsBatch = Collections.synchronizedList(new ArrayList<>());
 		List<T> updatedConsumers = Collections.synchronizedList(new ArrayList<>());
 		List<T> removedConsumers = Collections.synchronizedList(new ArrayList<>());
+		Map<Long, Double> userConsumptionMap = new ConcurrentHashMap<>();
+		List<StorageMeasurement> commercialStorageMeasurements = Collections.synchronizedList(new ArrayList<>());
+		List<StorageMeasurement> storageMeasurements = Collections.synchronizedList(new ArrayList<>());
 
-		processASync(activeConsumers, measurementsBatch, updatedConsumers, removedConsumers);
+		processSyncedInBatches(activeConsumers, measurementsBatch, updatedConsumers, removedConsumers, userConsumptionMap);
 
-		updateDatabase(updatedConsumers, removedConsumers, measurementsBatch);
+		updateStorages(userConsumptionMap, commercialStorageMeasurements, storageMeasurements);
 
-		measurementLogger.printAllEntries();
+		updateDatabase(updatedConsumers, removedConsumers, measurementsBatch, commercialStorageMeasurements, storageMeasurements);
+
+//		measurementLogger.printAllEntries();
 	}
 
-	private void processSynced(List<T> activeConsumers, List<ConsumptionMeasurement> measurementsBatch, List<T> updatedConsumers, List<T> removedConsumers) {
+	private void processSynced(
+			List<T> activeConsumers,
+			List<ConsumptionMeasurement> measurementsBatch,
+			List<T> updatedConsumers,
+			List<T> removedConsumers,
+			Map<Long, Double> userConsumptionMap
+	) {
 		for (T consumer : activeConsumers) {
 			Long id = getDeviceId(consumer);
 			if (id != null) {
 				T latestConsumer = getConsumerById(id);
 				if (latestConsumer != null) {
-					processConsumer(latestConsumer, measurementsBatch, updatedConsumers, removedConsumers).join();
+					processConsumer(latestConsumer, measurementsBatch, updatedConsumers, removedConsumers, userConsumptionMap);
 				}
 			}
 		}
 	}
 
-	private void processASync(List<T> activeConsumers, List<ConsumptionMeasurement> measurementsBatch, List<T> updatedConsumers, List<T> removedConsumers) {
-		List<CompletableFuture<Void>> tasks = new ArrayList<>();
+	private void processSyncedInBatches(
+			List<T> activeConsumers,
+			List<ConsumptionMeasurement> measurementsBatch,
+			List<T> updatedConsumers,
+			List<T> removedConsumers,
+			Map<Long, Double> userConsumptionMap
+	) {
+		int totalConsumers = activeConsumers.size();
 
-		for (T consumer : activeConsumers) {
-			Long id = getDeviceId(consumer);
-			if (id != null) {
-				T latestConsumer = getConsumerById(id);
-				if (latestConsumer != null) {
-					tasks.add(processConsumer(latestConsumer, measurementsBatch, updatedConsumers, removedConsumers));
+		for (int i = 0; i < totalConsumers; i += BATCH_SIZE) {
+			List<T> batch = activeConsumers.subList(i, Math.min(i + BATCH_SIZE, totalConsumers));
+
+			for (T consumer : batch) {
+				Long id = getDeviceId(consumer);
+				if (id != null) {
+					T latestConsumer = getConsumerById(id);
+					if (latestConsumer != null) {
+						processConsumer(latestConsumer, measurementsBatch, updatedConsumers, removedConsumers, userConsumptionMap);
+					}
 				}
 			}
 		}
-
-		CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0])).join();
 	}
 
-	private void updateDatabase(List<T> updatedConsumers, List<T> removedConsumers, List<ConsumptionMeasurement> measurementsBatch) {
+	private StorageMeasurement createStorageMeasurement(Long deviceId, Long ownerId, double capacity, double currentCharge) {
+		StorageMeasurement measurement = new StorageMeasurement();
+		measurement.setTimestamp(Instant.now());
+		measurement.setDeviceId(deviceId.toString());
+		measurement.setOwnerId(ownerId.toString());
+		measurement.setCapacity(capacity);
+		measurement.setCurrentCharge(currentCharge);
+		return measurement;
+	}
+
+	private synchronized void updateStorages(Map<Long, Double> userConsumptionMap, List<StorageMeasurement> commercialStorageMeasurements, List<StorageMeasurement> storageMeasurements) {
+
+		List<CommercialStorage> commercialStorages = commercialStorageService.getAll();
+		List<Storage> storages = storageService.getAll();
+
+		// 1. Gehe den Verbrauch pro Nutzer durch
+		for (Map.Entry<Long, Double> entry : userConsumptionMap.entrySet()) {
+			Long ownerId = entry.getKey();
+			double consumption = entry.getValue();
+			double netConsumption = consumption;
+
+			// 2. Hole die aktiven Storages des Nutzers aus den beiden Listen und sortiere sie nach consumingPriority (absteigend)
+			List<BaseStorage> ownerStorages = Stream.concat(commercialStorages.stream(), storages.stream())
+					.filter(storage -> storage.getOwnerId().equals(ownerId))
+					.sorted((a, b) -> Integer.compare(b.getConsumingPriority(), a.getConsumingPriority()))
+					.toList();
+
+			// 3. Ziehe Verbrauch von den Benutzer-Storages ab
+			for (BaseStorage storage : ownerStorages) {
+				double storageCurrentCharge = influxDBService.getCurrentChargeFromStorage(storage.getDeviceId());
+				if (netConsumption > 0) {
+					double newCharge = Math.max(0, storageCurrentCharge - netConsumption);
+					double consumed = storageCurrentCharge - newCharge;
+					netConsumption -= consumed;
+
+					// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
+					if (storage instanceof Storage) {
+						storageMeasurements.add(createStorageMeasurement(storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+					} else if (storage instanceof CommercialStorage) {
+						commercialStorageMeasurements.add(createStorageMeasurement(storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+					}
+				}
+			}
+
+			// 4. Wenn Benutzer keine Storages hat oder die Kapazität nicht ausreicht
+			if (netConsumption > 0) {
+
+				// Nach Priorität sortieren (höchste zuerst)
+				commercialStorages.sort((a, b) -> Integer.compare(b.getConsumingPriority(), a.getConsumingPriority()));
+
+				// Ziehe Verbrauch von den kommerziellen Storages ab
+				for (BaseStorage storage : commercialStorages) {
+					double storageCurrentCharge = influxDBService.getCurrentChargeFromStorage(storage.getDeviceId());
+					if (netConsumption > 0) {
+						double newCharge = Math.max(0, storageCurrentCharge - netConsumption);
+						double consumed = storageCurrentCharge - newCharge;
+						netConsumption -= consumed;
+
+						// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
+						if (storage instanceof Storage) {
+							storageMeasurements.add(createStorageMeasurement(storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+						} else if (storage instanceof CommercialStorage) {
+							commercialStorageMeasurements.add(createStorageMeasurement(storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+						}
+					}
+				}
+			}
+
+			// Falls immer noch Rest übrig ist, loggen wir diesen, da er nicht abgedeckt werden konnte
+			if (netConsumption > 0) {
+				System.out.println("Unverbrauchter Rest für Nutzer: " + ownerId + ". " + netConsumption + " kWh müssen dem NETZ abgezogen werden.");
+				// TODO Hier wird der Rest später dem NETZ zugewiesen beziehungsweise abgezogen
+			}
+		}
+	}
+
+	private void updateDatabase(
+			List<T> updatedConsumers,
+			List<T> removedConsumers,
+			List<ConsumptionMeasurement> measurementsBatch,
+			List<StorageMeasurement> commercialStorageMeasurements,
+			List<StorageMeasurement> storageMeasurements
+	) {
 		if (!updatedConsumers.isEmpty()) {
 			updateAll(updatedConsumers);
 		}
@@ -97,13 +208,27 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		if (!measurementsBatch.isEmpty()) {
 			influxDBService.saveConsumptionMeasurements(measurementsBatch, getMeasurementName());
 		}
+
+		if (!commercialStorageMeasurements.isEmpty()) {
+			influxDBService.saveStorageMeasurements(commercialStorageMeasurements, "commercial_storages");
+		}
+
+		if (!storageMeasurements.isEmpty()) {
+			influxDBService.saveStorageMeasurements(storageMeasurements, "storages");
+		}
+
 	}
 
-	public CompletableFuture<Void> processConsumer(
+	private void updateUserConsumption(Long userId, double consumption, Map<Long, Double> userConsumptionMap) {
+		userConsumptionMap.merge(userId, consumption, Double::sum);
+	}
+
+	public void processConsumer(
 			T consumer,
 			List<ConsumptionMeasurement> measurementsBatch,
 			List<T> updatedConsumers,
-			List<T> removedConsumers
+			List<T> removedConsumers,
+			Map<Long, Double> userConsumptionMap
 	) {
 		try {
 			// Initialisierung der Start- und Endzeiten der Messung
@@ -120,27 +245,25 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 
 			// Falls das Gerät neu gestartet wird und direkt beendet werden kann
 			if (justStarted && canFinish && !intervalStart.isBefore(endTime)) {
-				processSingleInterval(consumer, startTime, endTime, measurementsBatch);
+				processSingleInterval(consumer, startTime, endTime, measurementsBatch, userConsumptionMap);
 				prev = endTime;
 			}
 
 			// Verbrauchsdaten für wiederholte Intervalle verarbeiten
-			prev = processIntervals(consumer, prev, intervalStart, endTime, measurementsBatch);
+			prev = processIntervals(consumer, prev, intervalStart, endTime, measurementsBatch, userConsumptionMap);
 
 			// Letztes Intervall und Abschlussverarbeitung, falls nötig
 			if (canFinish) {
-				processEndPeriod(consumer, prev, measurementsBatch, removedConsumers);
+				processEndPeriod(consumer, prev, measurementsBatch, removedConsumers, userConsumptionMap);
 			}
 
 			// Speichern der letzten Aktualisierungszeit und Hinzufügen zur aktualisierten Liste
 			consumer.setLastUpdate(endTime);
 			updatedConsumers.add(consumer);
 
-			return CompletableFuture.completedFuture(null);
 		} catch (Exception e) {
 			// Fehlerbehandlung mit detaillierter Ausgabe
-			System.err.println("Fehler in der processConsumer-Methode für " + consumer.getClass().getSimpleName() + ": " + e.getMessage());
-			return CompletableFuture.failedFuture(e);
+			logger.error("Fehler in der processConsumer-Methode für {}: {}", consumer.getClass().getSimpleName(), e.getMessage());
 		}
 	}
 
@@ -170,7 +293,6 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			// Verbrauch initialisieren, wenn das Gerät gerade eingeschaltet wurde
 			ConsumptionMeasurement zeroMeasurement = createZeroMeasurementAtStart(consumer);
 			measurementsBatch.add(zeroMeasurement);
-			measurementLogger.addEntry(zeroMeasurement.getTimestamp(), String.format("Gerät angeschaltet. %.1f kWh für den Start gesetzt.", zeroMeasurement.getConsumption()));
 
 			Instant alignedStart = startTime.minusSeconds(startTime.getEpochSecond() % getIntervalInSeconds())
 					.truncatedTo(ChronoUnit.SECONDS)
@@ -184,16 +306,14 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			T consumer,
 			Instant startTime,
 			Instant endTime,
-			List<ConsumptionMeasurement> measurementsBatch
+			List<ConsumptionMeasurement> measurementsBatch,
+			Map<Long, Double> userConsumptionMap
 	) {
 		long elapsedTime = getElapsedTimeInMilliseconds(startTime, endTime);
 		double consumption = getConsumption(consumer, elapsedTime);
 
-		ConsumptionMeasurement measurement = createMeasurement(consumer, endTime, consumption);
+		ConsumptionMeasurement measurement = createMeasurement(consumer, endTime, consumption, userConsumptionMap);
 		measurementsBatch.add(measurement);
-		measurementLogger.addEntry(measurement.getTimestamp(), String.format(
-				"Gerät ausgeschaltet. Nur ein Intervall mit %d ms. Verbrauch: %.6f kWh.",
-				elapsedTime, measurement.getConsumption()));
 	}
 
 	private Instant processIntervals(
@@ -201,19 +321,16 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			Instant prev,
 			Instant intervalStart,
 			Instant endTime,
-			List<ConsumptionMeasurement> measurementsBatch
+			List<ConsumptionMeasurement> measurementsBatch,
+			Map<Long, Double> userConsumptionMap
 	) {
 		while (!intervalStart.isAfter(endTime)) {
 			long elapsedTime = getElapsedTimeInMilliseconds(prev, intervalStart);
 			double consumption = getConsumption(consumer, elapsedTime);
 
 			// Erfassen des Verbrauchs für das Intervall
-			ConsumptionMeasurement measurement = createMeasurement(consumer, intervalStart, consumption);
+			ConsumptionMeasurement measurement = createMeasurement(consumer, intervalStart, consumption, userConsumptionMap);
 			measurementsBatch.add(measurement);
-
-			measurementLogger.addEntry(measurement.getTimestamp(), String.format(
-					"Intervall von %d ms erfasst. Verbrauch: %.6f kWh.",
-					elapsedTime, consumption));
 
 			prev = intervalStart;
 			intervalStart = intervalStart.plusSeconds(getIntervalInSeconds());
@@ -225,29 +342,22 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			T consumer,
 			Instant prev,
 			List<ConsumptionMeasurement> measurementsBatch,
-			List<T> removedConsumers
+			List<T> removedConsumers,
+			Map<Long, Double> userConsumptionMap
 	) {
 		if (!consumer.getEndTime().equals(prev)) {
 			// Letztes Intervall vor dem Ausschalten
 			long lastIntervalElapsed = getElapsedTimeInMilliseconds(prev, consumer.getEndTime());
 			double consumption = getConsumption(consumer, lastIntervalElapsed);
 
-			ConsumptionMeasurement lastMeasurement = createMeasurement(consumer, consumer.getEndTime(), consumption);
+			ConsumptionMeasurement lastMeasurement = createMeasurement(consumer, consumer.getEndTime(), consumption, userConsumptionMap);
 			measurementsBatch.add(lastMeasurement);
-
-			measurementLogger.addEntry(lastMeasurement.getTimestamp(), String.format(
-					"Gerät wurde ausgeschaltet. Letztes Intervall von %d ms erfasst. Verbrauch: %.6f kWh.",
-					lastIntervalElapsed, lastMeasurement.getConsumption()));
 		}
 
 		// Verbrauch nach dem Ende initialisieren und Verbraucher entfernen
 		ConsumptionMeasurement zeroMeasurement = createZeroMeasurementAtEnd(consumer);
 		measurementsBatch.add(zeroMeasurement);
 		removedConsumers.add(consumer);
-
-		measurementLogger.addEntry(zeroMeasurement.getTimestamp(), String.format(
-				"Gerät ist ausgeschaltet. %.1f kWh für das Ende gesetzt.",
-				zeroMeasurement.getConsumption()));
 	}
 
 	private static <T extends BaseConsumer> @Nullable Long getDeviceId(T consumer) {
@@ -294,13 +404,19 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		return measurement;
 	}
 
-	private ConsumptionMeasurement createMeasurement(T consumer, Instant time, double consumption) {
+	private ConsumptionMeasurement createMeasurement(
+			T consumer,
+			Instant time,
+			double consumption,
+			Map<Long, Double> userConsumptionMap
+	) {
 		ConsumptionMeasurement measurement = new ConsumptionMeasurement();
 		Instant timestamp = time.truncatedTo(ChronoUnit.MILLIS);
 		measurement.setTimestamp(timestamp);
 		measurement.setDeviceId(consumer.getDeviceId());
 		measurement.setOwnerId(consumer.getOwnerId());
 		measurement.setConsumption(consumption);
+		updateUserConsumption(consumer.getOwnerId(), consumption, userConsumptionMap);
 		return measurement;
 	}
 }

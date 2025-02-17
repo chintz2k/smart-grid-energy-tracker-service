@@ -1,22 +1,28 @@
 package com.energytracker.quartz.jobs.producer;
 
+import com.energytracker.entity.CommercialStorage;
 import com.energytracker.entity.Producer;
+import com.energytracker.entity.Storage;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.service.GeneralDeviceService;
 import com.energytracker.webclients.WeatherApiClient;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 /**
  * @author André Heinen
  */
+@Component
 public class ProducerLoggerJob extends AbstractProducerLoggerJob<Producer> {
 
 	private final GeneralDeviceService<Producer> producerService;
 
-	public ProducerLoggerJob(InfluxDBService influxDBService, WeatherApiClient weatherApiClient, GeneralDeviceService<Producer> producerService) {
-		super(influxDBService, weatherApiClient);
+	@Autowired
+	public ProducerLoggerJob(InfluxDBService influxDBService, WeatherApiClient weatherApiClient, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService, GeneralDeviceService<Producer> producerService) {
+		super(influxDBService, weatherApiClient, commercialStorageService, storageService);
 		this.producerService = producerService;
 	}
 
