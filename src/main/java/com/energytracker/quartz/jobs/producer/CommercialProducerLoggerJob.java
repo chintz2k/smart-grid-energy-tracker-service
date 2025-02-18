@@ -38,7 +38,7 @@ public class CommercialProducerLoggerJob extends AbstractProducerLoggerJob<Comme
 
 	@Override
 	protected String getMeasurementName() {
-		return "commercial_producer_production";
+		return "production_device_commercial";
 	}
 
 	@Override

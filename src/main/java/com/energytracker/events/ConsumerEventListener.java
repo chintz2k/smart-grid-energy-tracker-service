@@ -46,4 +46,24 @@ public class ConsumerEventListener {
 			}
 		}
 	}
+
+	@KafkaListener(topics = "smart-consumer-events", groupId = "energy-tracker-group")
+	public void processSmartConsumerEvent(String message) throws JsonProcessingException {
+		ConsumerEvent consumerEvent = objectMapper.readValue(message, ConsumerEvent.class);
+		if (consumerEvent.isCommercial()) {
+			if (consumerEvent.isActive()) {
+				CommercialConsumer commercialConsumer = consumerEvent.toCommercialConsumer();
+				commercialConsumerService.add(commercialConsumer);
+			} else {
+				commercialConsumerService.updateEndTime(consumerEvent.getDeviceId(), consumerEvent.getTimestamp());
+			}
+		} else {
+			if (consumerEvent.isActive()) {
+				Consumer consumer = consumerEvent.toConsumer();
+				consumerService.add(consumer);
+			} else {
+				consumerService.updateEndTime(consumerEvent.getDeviceId(), consumerEvent.getTimestamp());
+			}
+		}
+	}
 }

@@ -38,7 +38,7 @@ public class ProducerLoggerJob extends AbstractProducerLoggerJob<Producer> {
 
 	@Override
 	protected String getMeasurementName() {
-		return "producer_production";
+		return "production_device";
 	}
 
 	@Override

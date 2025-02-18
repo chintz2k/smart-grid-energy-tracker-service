@@ -19,11 +19,9 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -66,7 +64,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		List<ProductionMeasurement> measurementsBatch = Collections.synchronizedList(new ArrayList<>());
 		List<T> updatedProducers = Collections.synchronizedList(new ArrayList<>());
 		List<T> removedProducers = Collections.synchronizedList(new ArrayList<>());
-		Map<Long, Double> userProductionMap = new ConcurrentHashMap<>();
+		Map<Long, List<ProductionMeasurement>> ownerProductionData = new ConcurrentHashMap<>();
 		List<StorageMeasurement> commercialStorageMeasurements = Collections.synchronizedList(new ArrayList<>());
 		List<StorageMeasurement> storageMeasurements = Collections.synchronizedList(new ArrayList<>());
 
@@ -76,11 +74,16 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			windPowerModificator = response.getWindPower();
 		}
 
-		processSyncedInBatches(activeProducers, measurementsBatch, updatedProducers, removedProducers, userProductionMap);
+		processSyncedInBatches(activeProducers, measurementsBatch, updatedProducers, removedProducers, ownerProductionData);
 
-		updateStorages(userProductionMap, commercialStorageMeasurements, storageMeasurements);
+		Map<Long, Double> totalProductionOfOwnerMap = getTotalProductionByOwnerAsMap(ownerProductionData);
+		updateStorages(commercialStorageMeasurements, storageMeasurements, totalProductionOfOwnerMap);
 
-		updateDatabase(updatedProducers, removedProducers, measurementsBatch, commercialStorageMeasurements, storageMeasurements);
+		List<ProductionMeasurement> totalProductionByOwnerAndPowerTypeAndTimestamp = calculateTotalProductionByOwnerAndPowerTypeAndTimestamp(ownerProductionData);
+		List<ProductionMeasurement> totalProductionByOwnerAndByTimestamp = calculateTotalProductionByOwnerAndTimestamp(ownerProductionData);
+		List<ProductionMeasurement> totalProductionByPowerTypeAndTimestamp = calculateTotalProductionByPowerTypeAndTimestamp(ownerProductionData);
+		List<ProductionMeasurement> totalProductionByTimestamp = calculateTotalProductionByTimestamp(ownerProductionData);
+		updateDatabase(updatedProducers, removedProducers, measurementsBatch, commercialStorageMeasurements, storageMeasurements, totalProductionByOwnerAndPowerTypeAndTimestamp, totalProductionByOwnerAndByTimestamp, totalProductionByPowerTypeAndTimestamp, totalProductionByTimestamp);
 	}
 
 	private void processSynced(
@@ -88,14 +91,14 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			List<ProductionMeasurement> measurementsBatch,
 			List<T> updatedProducers,
 			List<T> removedProducers,
-			Map<Long, Double> userProductionMap
+			Map<Long, List<ProductionMeasurement>> ownerProductionData
 	) {
 		for (T producer : activeProducers) {
 			Long id = getDeviceId(producer);
 			if (id != null) {
 				T latestProducer = getProducerById(id);
 				if (latestProducer != null) {
-					processProducer(latestProducer, measurementsBatch, updatedProducers, removedProducers, userProductionMap);
+					processProducer(latestProducer, measurementsBatch, updatedProducers, removedProducers, ownerProductionData);
 				}
 			}
 		}
@@ -106,7 +109,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			List<ProductionMeasurement> measurementsBatch,
 			List<T> updatedProducers,
 			List<T> removedProducers,
-			Map<Long, Double> userProductionMap
+			Map<Long, List<ProductionMeasurement>> ownerProductionData
 	) {
 		int totalProducers = activeProducers.size();
 
@@ -118,16 +121,16 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 				if (id != null) {
 					T latestProducer = getProducerById(id);
 					if (latestProducer != null) {
-						processProducer(latestProducer, measurementsBatch, updatedProducers, removedProducers, userProductionMap);
+						processProducer(latestProducer, measurementsBatch, updatedProducers, removedProducers, ownerProductionData);
 					}
 				}
 			}
 		}
 	}
 
-	private StorageMeasurement createStorageMeasurement(Long deviceId, Long ownerId, double capacity, double currentCharge) {
+	private StorageMeasurement createStorageMeasurement(Instant time, Long deviceId, Long ownerId, double capacity, double currentCharge) {
 		StorageMeasurement measurement = new StorageMeasurement();
-		measurement.setTimestamp(Instant.now());
+		measurement.setTimestamp(time);
 		measurement.setDeviceId(deviceId.toString());
 		measurement.setOwnerId(ownerId.toString());
 		measurement.setCapacity(capacity);
@@ -135,16 +138,22 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		return measurement;
 	}
 
-	private synchronized void updateStorages(Map<Long, Double> userProductionMap, List<StorageMeasurement> commercialStorageMeasurements, List<StorageMeasurement> storageMeasurements) {
+	private synchronized void updateStorages(
+			List<StorageMeasurement> commercialStorageMeasurements,
+			List<StorageMeasurement> storageMeasurements,
+			Map<Long, Double> totalProductionOfOwnerMap
+	) {
 
 		List<CommercialStorage> commercialStorages = commercialStorageService.getAll();
 		List<Storage> storages = storageService.getAll();
 
 		// 1. Gehe die Produktion pro Nutzer durch
-		for (Map.Entry<Long, Double> entry : userProductionMap.entrySet()) {
+		for (Map.Entry<Long, Double> entry : totalProductionOfOwnerMap.entrySet()) {
 			Long ownerId = entry.getKey();
 			double production = entry.getValue();
 			double netProduction = production;
+
+			Instant time = Instant.now();
 
 			// 2. Hole die aktiven Storages des Nutzers aus den beiden Listen und sortiere sie nach chargingPriority (absteigend)
 			List<BaseStorage> ownerStorages = Stream.concat(commercialStorages.stream(), storages.stream())
@@ -155,6 +164,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			// 3. Produktion auf die Storages des Nutzers verteilen
 			for (BaseStorage storage : ownerStorages) {
 				double storageCurrentCharge = influxDBService.getCurrentChargeFromStorage(storage.getDeviceId());
+				System.out.println("OwnerStorage " + storage.getDeviceId() + " hat derzeit " + String.format("%.6f", storageCurrentCharge) + " kWh geladen.");
 				double capacity = storage.getCapacity();
 				if (netProduction > 0) {
 					double availableSpace = capacity - storageCurrentCharge;
@@ -166,9 +176,9 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 
 					// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
 					if (storage instanceof Storage) {
-						storageMeasurements.add(createStorageMeasurement(storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+						storageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
 					} else if (storage instanceof CommercialStorage) {
-						commercialStorageMeasurements.add(createStorageMeasurement(storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+						commercialStorageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
 					}
 				}
 			}
@@ -182,6 +192,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 				// Ziehe Verbrauch von den kommerziellen Storages ab
 				for (BaseStorage storage : commercialStorages) {
 					double storageCurrentCharge = influxDBService.getCurrentChargeFromStorage(storage.getDeviceId());
+					System.out.println("CommercialStorage " + storage.getDeviceId() + " hat derzeit " + String.format("%.6f", storageCurrentCharge) + " kWh geladen.");
 					double capacity = storage.getCapacity();
 					if (netProduction > 0) {
 						double availableSpace = capacity - storageCurrentCharge;
@@ -193,9 +204,9 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 
 						// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
 						if (storage instanceof Storage) {
-							storageMeasurements.add(createStorageMeasurement(storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+							storageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
 						} else if (storage instanceof CommercialStorage) {
-							commercialStorageMeasurements.add(createStorageMeasurement(storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+							commercialStorageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
 						}
 					}
 				}
@@ -203,7 +214,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 
 			// Falls immer noch Rest übrig ist, loggen wir diesen, da er nicht abgedeckt werden konnte
 			if (netProduction > 0) {
-				System.out.println("Überschüssige Energieproduktion für Nutzer: " + ownerId + ". " + netProduction + " kWh müssen dem NETZ zugefügt werden.");
+				System.out.println("Nicht genug Kapazität vorhanden. Dem NETZ wird " + String.format("%.6f", netProduction) + " kWh hinzugefügt.");
 				// TODO Hier wird der Rest später dem NETZ zugewiesen beziehungsweise abgezogen
 			}
 		}
@@ -214,14 +225,14 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			List<T> removedProducers,
 			List<ProductionMeasurement> measurementsBatch,
 			List<StorageMeasurement> commercialStorageMeasurements,
-			List<StorageMeasurement> storageMeasurements
+			List<StorageMeasurement> storageMeasurements,
+			List<ProductionMeasurement> totalProductionByOwnerAndPowerTypeAndTimestamp,
+			List<ProductionMeasurement> totalProductionOfOwnerByTimestamp,
+			List<ProductionMeasurement> totalProductionByPowerTypeAndTimestamp,
+			List<ProductionMeasurement> totalProductionByTimestamp
 	) {
 		if (!updatedProducers.isEmpty()) {
 			updateAll(updatedProducers);
-		}
-
-		if (!removedProducers.isEmpty()) {
-			removeAll(removedProducers);
 		}
 
 		if (!measurementsBatch.isEmpty()) {
@@ -229,17 +240,32 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		}
 
 		if (!commercialStorageMeasurements.isEmpty()) {
-			influxDBService.saveStorageMeasurements(commercialStorageMeasurements, "commercial_storages");
+			influxDBService.saveStorageMeasurements(commercialStorageMeasurements, "storages_commercial");
 		}
 
 		if (!storageMeasurements.isEmpty()) {
 			influxDBService.saveStorageMeasurements(storageMeasurements, "storages");
 		}
 
-	}
+		if (!totalProductionByOwnerAndPowerTypeAndTimestamp.isEmpty()) {
+			influxDBService.saveProductionMeasurements(totalProductionByOwnerAndPowerTypeAndTimestamp, "production_owner");
+		}
 
-	private void updateUserProduction(Long userId, double production, Map<Long, Double> userProductionMap) {
-		userProductionMap.merge(userId, production, Double::sum);
+		if (!totalProductionOfOwnerByTimestamp.isEmpty()) {
+			influxDBService.saveProductionMeasurements(totalProductionOfOwnerByTimestamp, "production_owner");
+		}
+
+		if (!totalProductionByPowerTypeAndTimestamp.isEmpty()) {
+			influxDBService.saveProductionMeasurements(totalProductionByPowerTypeAndTimestamp, "production_total");
+		}
+
+		if (!totalProductionByTimestamp.isEmpty()) {
+			influxDBService.saveProductionMeasurements(totalProductionByTimestamp, "production_total");
+		}
+
+		if (!removedProducers.isEmpty()) {
+			removeAll(removedProducers);
+		}
 	}
 
 	public void processProducer(
@@ -247,7 +273,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			List<ProductionMeasurement> measurementsBatch,
 			List<T> updatedProducers,
 			List<T> removedProducers,
-			Map<Long, Double> userProductionMap
+			Map<Long, List<ProductionMeasurement>> ownerProductionData
 	) {
 		try {
 			// Initialisierung der Start- und Endzeiten der Messung
@@ -264,21 +290,22 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 
 			// Falls das Gerät neu gestartet wird und direkt beendet werden kann
 			if (justStarted && canFinish && !intervalStart.isBefore(endTime)) {
-				processSingleInterval(producer, startTime, endTime, measurementsBatch, userProductionMap);
+				processSingleInterval(producer, startTime, endTime, measurementsBatch, ownerProductionData);
 				prev = endTime;
 			}
 
 			// Verbrauchsdaten für wiederholte Intervalle verarbeiten
-			prev = processIntervals(producer, prev, intervalStart, endTime, measurementsBatch, userProductionMap);
+			prev = processIntervals(producer, prev, intervalStart, endTime, measurementsBatch, ownerProductionData);
 
 			// Letztes Intervall und Abschlussverarbeitung, falls nötig
 			if (canFinish) {
-				processEndPeriod(producer, prev, measurementsBatch, removedProducers, userProductionMap);
+				processEndPeriod(producer, prev, measurementsBatch, removedProducers, ownerProductionData);
 			}
 
 			// Speichern der letzten Aktualisierungszeit und Hinzufügen zur aktualisierten Liste
 			producer.setLastUpdate(endTime);
 			updatedProducers.add(producer);
+
 		} catch (Exception e) {
 			// Fehlerbehandlung mit detaillierter Ausgabe
 			logger.error("Fehler in der processProducer-Methode für {}: {}", producer.getClass().getSimpleName(), e.getMessage());
@@ -325,12 +352,12 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			Instant startTime,
 			Instant endTime,
 			List<ProductionMeasurement> measurementsBatch,
-			Map<Long, Double> userProductionMap
+			Map<Long, List<ProductionMeasurement>> ownerProductionData
 	) {
 		long elapsedTime = getElapsedTimeInMilliseconds(startTime, endTime);
 		double production = getProduction(producer, elapsedTime);
 
-		ProductionMeasurement measurement = createMeasurement(producer, endTime, production, userProductionMap);
+		ProductionMeasurement measurement = createMeasurement(producer, endTime, production, ownerProductionData);
 		measurementsBatch.add(measurement);
 	}
 
@@ -340,14 +367,14 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			Instant intervalStart,
 			Instant endTime,
 			List<ProductionMeasurement> measurementsBatch,
-			Map<Long, Double> userProductionMap
+			Map<Long, List<ProductionMeasurement>> ownerProductionData
 	) {
 		while (!intervalStart.isAfter(endTime)) {
 			long elapsedTime = getElapsedTimeInMilliseconds(prev, intervalStart);
 			double production = getProduction(producer, elapsedTime);
 
 			// Erfassen des Verbrauchs für das Intervall
-			ProductionMeasurement measurement = createMeasurement(producer, intervalStart, production, userProductionMap);
+			ProductionMeasurement measurement = createMeasurement(producer, intervalStart, production, ownerProductionData);
 			measurementsBatch.add(measurement);
 
 			prev = intervalStart;
@@ -361,14 +388,14 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			Instant prev,
 			List<ProductionMeasurement> measurementsBatch,
 			List<T> removedProducers,
-			Map<Long, Double> userProductionMap
+			Map<Long, List<ProductionMeasurement>> ownerProductionData
 	) {
 		if (!producer.getEndTime().equals(prev)) {
 			// Letztes Intervall vor dem Ausschalten
 			long lastIntervalElapsed = getElapsedTimeInMilliseconds(prev, producer.getEndTime());
 			double production = getProduction(producer, lastIntervalElapsed);
 
-			ProductionMeasurement lastMeasurement = createMeasurement(producer, producer.getEndTime(), production, userProductionMap);
+			ProductionMeasurement lastMeasurement = createMeasurement(producer, producer.getEndTime(), production, ownerProductionData);
 			measurementsBatch.add(lastMeasurement);
 		}
 
@@ -410,7 +437,8 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		measurement.setDeviceId(producer.getDeviceId());
 		measurement.setOwnerId(producer.getOwnerId());
 		measurement.setPowerType(producer.getPowerType());
-		measurement.setRenewable(producer.isRenewable());
+		String renewable = producer.isRenewable() ? "true" : "false";
+		measurement.setRenewable(renewable);
 		measurement.setProduction(0.0);
 		return measurement;
 	}
@@ -423,7 +451,8 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		measurement.setDeviceId(producer.getDeviceId());
 		measurement.setOwnerId(producer.getOwnerId());
 		measurement.setPowerType(producer.getPowerType());
-		measurement.setRenewable(producer.isRenewable());
+		String renewable = producer.isRenewable() ? "true" : "false";
+		measurement.setRenewable(renewable);
 		measurement.setProduction(0.0);
 		return measurement;
 	}
@@ -432,7 +461,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			T producer,
 			Instant time,
 			double production,
-			Map<Long, Double> userProductionMap
+			Map<Long, List<ProductionMeasurement>> ownerProductionData
 	) {
 		ProductionMeasurement measurement = new ProductionMeasurement();
 		Instant timestamp = time.truncatedTo(ChronoUnit.MILLIS);
@@ -440,9 +469,244 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		measurement.setDeviceId(producer.getDeviceId());
 		measurement.setOwnerId(producer.getOwnerId());
 		measurement.setPowerType(producer.getPowerType());
-		measurement.setRenewable(producer.isRenewable());
+		String renewable = producer.isRenewable() ? "true" : "false";
+		measurement.setRenewable(renewable);
 		measurement.setProduction(production);
-		updateUserProduction(producer.getOwnerId(), production, userProductionMap);
+		updateOwnerProductionHistory(producer.getOwnerId(), measurement, ownerProductionData);
 		return measurement;
+	}
+
+	private void updateOwnerProductionHistory(
+			Long ownerId,
+			ProductionMeasurement measurement,
+			Map<Long, List<ProductionMeasurement>> ownerProductionData
+	) {
+		ownerProductionData.computeIfAbsent(ownerId, k -> new ArrayList<>()).add(measurement);
+	}
+
+	private Map<Long, Double> getTotalProductionByOwnerAsMap(Map<Long, List<ProductionMeasurement>> ownerProductionData) {
+		// Erstelle eine neue Map, in der die Ergebnisse gespeichert werden.
+		Map<Long, Double> totalProductionByOwner = new ConcurrentHashMap<>();
+
+		// Iteriere über die bestehende Map und berechne die Gesamtproduktion pro Owner
+		ownerProductionData.forEach((ownerId, measurements) -> {
+			double totalProduction = measurements.stream()
+					.mapToDouble(ProductionMeasurement::getProduction)
+					.sum();
+			totalProductionByOwner.put(ownerId, totalProduction);
+		});
+
+		return totalProductionByOwner;
+	}
+
+	private List<ProductionMeasurement> calculateTotalProductionByOwnerAndTimestamp(
+			Map<Long, List<ProductionMeasurement>> ownerProductionData
+	) {
+
+		// Liste, um die neuen Messungen zu sammeln
+		List<ProductionMeasurement> totalMeasurements = new ArrayList<>();
+
+		// Iteriere über jeden Owner und deren Produktionsdaten
+		ownerProductionData.forEach((ownerId, measurements) -> {
+			// Zusammenfassen der Produktion pro Zeitstempel
+			Map<Instant, Double> productionByTimestamp = new ConcurrentHashMap<>();
+
+			// Gehe durch die Messungen und summiere die Produktion pro Zeitstempel
+			for (ProductionMeasurement measurement : measurements) {
+				Instant timestamp = measurement.getTimestamp();
+				double production = measurement.getProduction();
+
+				// Füge Werte mit gleichem Zeitstempel zusammen
+				productionByTimestamp.merge(timestamp, production, Double::sum);
+			}
+
+			// Erstelle für jeden Zeitstempel ein neues ProductionMeasurement mit der Gesamtproduktion
+			productionByTimestamp.forEach((timestamp, totalProduction) -> {
+				ProductionMeasurement totalMeasurement = new ProductionMeasurement();
+				totalMeasurement.setTimestamp(timestamp);
+				totalMeasurement.setDeviceId(null); // Kein spezifisches Device, da die Summe aller Devices umfasst ist
+				totalMeasurement.setOwnerId(ownerId);
+				totalMeasurement.setProduction(totalProduction);
+				totalMeasurement.setPowerType("all");
+				totalMeasurement.setRenewable("beides");
+
+				totalMeasurements.add(totalMeasurement);
+			});
+		});
+
+		return totalMeasurements;
+	}
+
+	private List<ProductionMeasurement> calculateTotalProductionByOwnerAndPowerTypeAndTimestamp(
+			Map<Long, List<ProductionMeasurement>> ownerProductionData) {
+
+		// Ergebnisliste für aggregierte Produktionsmessungen
+		List<ProductionMeasurement> aggregatedMeasurements = new ArrayList<>();
+
+		// Iteriere durch alle Owner und ihre Produktionsdaten
+		for (Map.Entry<Long, List<ProductionMeasurement>> ownerEntry : ownerProductionData.entrySet()) {
+			Long ownerId = ownerEntry.getKey();
+			List<ProductionMeasurement> measurements = ownerEntry.getValue();
+
+			// Map zur Aggregation: powerType -> (timestamp -> List<ProductionMeasurement>)
+			Map<String, Map<Instant, List<ProductionMeasurement>>> organizedData = new HashMap<>();
+
+			// Gruppiere die Messungen nach powerType und timestamp
+			for (ProductionMeasurement measurement : measurements) {
+				String powerType = measurement.getPowerType();
+				Instant timestamp = measurement.getTimestamp();
+
+				organizedData
+						.computeIfAbsent(powerType, k -> new HashMap<>())
+						.computeIfAbsent(timestamp, k -> new ArrayList<>())
+						.add(measurement);
+			}
+
+			// Erstelle neue aggregierte `ProductionMeasurement`-Objekte
+			for (Map.Entry<String, Map<Instant, List<ProductionMeasurement>>> powerTypeEntry : organizedData.entrySet()) {
+				String powerType = powerTypeEntry.getKey();
+
+				for (Map.Entry<Instant, List<ProductionMeasurement>> timestampEntry : powerTypeEntry.getValue().entrySet()) {
+					Instant timestamp = timestampEntry.getKey();
+					List<ProductionMeasurement> groupedMeasurements = timestampEntry.getValue();
+
+					// Berechne die Gesamtproduktion
+					double totalProduction = groupedMeasurements.stream()
+							.mapToDouble(ProductionMeasurement::getProduction)
+							.sum();
+
+					// Bestimme den `renewable`-Wert
+					Set<String> renewableValues = groupedMeasurements.stream()
+							.map(ProductionMeasurement::getRenewable)
+							.collect(Collectors.toSet());
+
+					String renewable;
+					if (renewableValues.size() == 1) {
+						// Nur ein `renewable`-Wert vorhanden, entweder "true" oder "false"
+						renewable = renewableValues.iterator().next();
+					} else {
+						// Gemischte `renewable`-Werte
+						renewable = "mixed";
+					}
+
+					// Neues ProductionMeasurement mit aggregierten und ermittelten Werten erstellen
+					ProductionMeasurement aggregatedMeasurement = new ProductionMeasurement();
+					aggregatedMeasurement.setOwnerId(ownerId);
+					aggregatedMeasurement.setTimestamp(timestamp);
+					aggregatedMeasurement.setProduction(totalProduction);
+					aggregatedMeasurement.setPowerType(powerType);
+					aggregatedMeasurement.setRenewable(renewable); // Setzen des renewable-Wertes
+
+					// Füge zur Ergebnisliste hinzu
+					aggregatedMeasurements.add(aggregatedMeasurement);
+				}
+			}
+		}
+
+		return aggregatedMeasurements;
+	}
+
+	private List<ProductionMeasurement> calculateTotalProductionByTimestamp(
+			Map<Long, List<ProductionMeasurement>> ownerProductionData
+	) {
+
+		// Liste, um die neuen Messungen zu sammeln
+		List<ProductionMeasurement> totalMeasurments = new ArrayList<>();
+
+		// Map zur Aggregation der Produktion je Timestamp
+		Map<Instant, Double> productionByTimestamp = new ConcurrentHashMap<>();
+
+		// Iteriere durch alle Owners und deren Produktionsdaten
+		ownerProductionData.forEach((ownerId, measurements) -> {
+			// Gehe durch jede Produktionsmessung des aktuellen Owners
+			for (ProductionMeasurement measurement : measurements) {
+				Instant timestamp = measurement.getTimestamp();
+				double production = measurement.getProduction();
+
+				// Summiere die Produktion für jeden Zeitstempel
+				productionByTimestamp.merge(timestamp, production, Double::sum);
+			}
+		});
+
+		// Erstelle für jeden Zeitstempel ein neues ProductionMeasurement und füge es der Liste hinzu
+		productionByTimestamp.forEach((timestamp, totalProduction) -> {
+			ProductionMeasurement totalMeasurement = new ProductionMeasurement();
+			totalMeasurement.setTimestamp(timestamp);
+			totalMeasurement.setDeviceId(null); // Kein spezifisches Device, da die Summe aller Devices umfasst ist
+			totalMeasurement.setOwnerId(null); // Kein spezifischer Owner, da die Summe aller Owner umfasst ist
+			totalMeasurement.setProduction(totalProduction);
+			totalMeasurement.setPowerType("all");
+			totalMeasurement.setRenewable("mixed");
+
+			totalMeasurments.add(totalMeasurement);
+		});
+
+		return totalMeasurments;
+	}
+
+	public List<ProductionMeasurement> calculateTotalProductionByPowerTypeAndTimestamp(
+			Map<Long, List<ProductionMeasurement>> ownerProductionData) {
+
+		// Map zur Aggregation: powerType -> (timestamp -> List<ProductionMeasurement>)
+		Map<String, Map<Instant, List<ProductionMeasurement>>> aggregatedData = new HashMap<>();
+
+		// Iteriere durch alle Owner und ihre Produktionsdaten und mische sie zu einer allgemeinen Struktur
+		for (List<ProductionMeasurement> measurements : ownerProductionData.values()) {
+			for (ProductionMeasurement measurement : measurements) {
+				String powerType = measurement.getPowerType();
+				Instant timestamp = measurement.getTimestamp();
+
+				aggregatedData
+						.computeIfAbsent(powerType, k -> new HashMap<>())
+						.computeIfAbsent(timestamp, k -> new ArrayList<>())
+						.add(measurement);
+			}
+		}
+
+		// Ergebnisliste für aggregierte Produktionsmessungen
+		List<ProductionMeasurement> aggregatedMeasurements = new ArrayList<>();
+
+		// Verarbeite aggregierte Daten und erstelle neue Measurements
+		for (Map.Entry<String, Map<Instant, List<ProductionMeasurement>>> powerTypeEntry : aggregatedData.entrySet()) {
+			String powerType = powerTypeEntry.getKey();
+
+			for (Map.Entry<Instant, List<ProductionMeasurement>> timestampEntry : powerTypeEntry.getValue().entrySet()) {
+				Instant timestamp = timestampEntry.getKey();
+				List<ProductionMeasurement> groupedMeasurements = timestampEntry.getValue();
+
+				// Berechne die Gesamtproduktion
+				double totalProduction = groupedMeasurements.stream()
+						.mapToDouble(ProductionMeasurement::getProduction)
+						.sum();
+
+				// Bestimme den `renewable`-Wert
+				Set<String> renewableValues = groupedMeasurements.stream()
+						.map(ProductionMeasurement::getRenewable)
+						.collect(Collectors.toSet());
+
+				String renewable;
+				if (renewableValues.size() == 1) {
+					// Nur ein `renewable`-Wert vorhanden, entweder "true" oder "false"
+					renewable = renewableValues.iterator().next();
+				} else {
+					// Gemischte `renewable`-Werte
+					renewable = "mixed";
+				}
+
+				// Neues ProductionMeasurement mit aggregierten Werten erstellen
+				ProductionMeasurement aggregatedMeasurement = new ProductionMeasurement();
+				aggregatedMeasurement.setTimestamp(timestamp);
+				aggregatedMeasurement.setDeviceId(null);
+				aggregatedMeasurement.setOwnerId(null);
+				aggregatedMeasurement.setProduction(totalProduction);
+				aggregatedMeasurement.setPowerType(powerType);
+				aggregatedMeasurement.setRenewable(renewable);
+
+				// Füge zur Ergebnisliste hinzu
+				aggregatedMeasurements.add(aggregatedMeasurement);
+			}
+		}
+
+		return aggregatedMeasurements;
 	}
 }

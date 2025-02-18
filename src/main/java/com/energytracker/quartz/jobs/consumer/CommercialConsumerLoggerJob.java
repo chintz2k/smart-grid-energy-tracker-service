@@ -37,7 +37,7 @@ public class CommercialConsumerLoggerJob extends AbstractConsumerLoggerJob<Comme
 
 	@Override
 	protected String getMeasurementName() {
-		return "commercial_consumer_consumption";
+		return "consumption_device_commercial";
 	}
 
 	@Override

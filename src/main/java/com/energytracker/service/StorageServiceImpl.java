@@ -5,6 +5,8 @@ import com.energytracker.repository.StorageRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 /**
  * @author André Heinen
  */
@@ -23,5 +25,14 @@ public class StorageServiceImpl extends GeneralDeviceServiceImpl<Storage, Storag
 				.filter(device -> device.getEndTime() == null)
 				.findFirst()
 				.orElse(null);
+	}
+
+	@Override
+	@Transactional
+	public void updateEndTime(Long deviceId, Instant endTime) {
+		Storage device = getOpenDeviceByDeviceId(deviceId);
+		if (device != null) {
+			repository.delete(device);
+		}
 	}
 }

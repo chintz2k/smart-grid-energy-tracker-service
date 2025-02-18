@@ -12,7 +12,7 @@ public class ProductionMeasurement {
 	private Long ownerId;
 	private double production;
 	private String powerType;
-	private boolean renewable;
+	private String renewable;
 
 	public ProductionMeasurement() {
 
@@ -59,10 +59,14 @@ public class ProductionMeasurement {
 	}
 
 	public boolean isRenewable() {
+		return renewable.equals("true");
+	}
+
+	public String getRenewable() {
 		return renewable;
 	}
 
-	public void setRenewable(boolean renewable) {
+	public void setRenewable(String renewable) {
 		this.renewable = renewable;
 	}
 }

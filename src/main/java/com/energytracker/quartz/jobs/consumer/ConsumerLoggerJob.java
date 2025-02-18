@@ -37,7 +37,7 @@ public class ConsumerLoggerJob extends AbstractConsumerLoggerJob<Consumer> {
 
 	@Override
 	protected String getMeasurementName() {
-		return "consumer_consumption";
+		return "consumption_device";
 	}
 
 	@Override

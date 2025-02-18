@@ -28,6 +28,7 @@ public class InfluxDBService {
 	private static final Logger logger = LoggerFactory.getLogger(InfluxDBService.class);
 
 	private final String org = "chintz_de";
+
 	private final String bucketConsumption = "energy_tracker";
 	private final String bucketProduction = "energy_tracker";
 	private final String bucketStorage = "energy_tracker";
@@ -37,6 +38,11 @@ public class InfluxDBService {
 	@Autowired
 	public InfluxDBService(InfluxDBClient influxDBClient) {
 		this.influxDBClient = influxDBClient;
+	}
+
+	public void saveTotalConsumptionMeasurement(ConsumptionMeasurement measurement) {
+		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
+		writeApi.writePoint(bucketConsumption, org, createConsumptionMeasurementPoint(measurement, "consumption_total"));
 	}
 
 	public void saveConsumptionMeasurements(List<ConsumptionMeasurement> measurements, @NotNull @NotBlank String measurementName) {
@@ -64,24 +70,43 @@ public class InfluxDBService {
 	}
 
 	private Point createConsumptionMeasurementPoint(ConsumptionMeasurement measurement, String measurementName) {
+		String deviceId = null;
+		if (measurement.getDeviceId() != null) {
+			deviceId = measurement.getDeviceId().toString();
+		}
+		String ownerId = null;
+		if (measurement.getOwnerId() != null) {
+			ownerId = measurement.getOwnerId().toString();
+		}
 		return Point.measurement(measurementName)
 				.time(measurement.getTimestamp().toEpochMilli(), WritePrecision.MS)
-				.addTag("deviceId", measurement.getDeviceId().toString())
-				.addTag("ownerId", measurement.getOwnerId().toString())
+				.addTag("deviceId", deviceId)
+				.addTag("ownerId", ownerId)
 				.addField("kWh", measurement.getConsumption());
 	}
 
 	private Point createProductionMeasurementPoint(ProductionMeasurement measurement, String measurementName) {
+		String deviceId = null;
+		if (measurement.getDeviceId() != null) {
+			deviceId = measurement.getDeviceId().toString();
+		}
+		String ownerId = null;
+		if (measurement.getOwnerId() != null) {
+			ownerId = measurement.getOwnerId().toString();
+		}
 		String renewableString;
 		if (measurement.isRenewable()) {
 			renewableString = "erneuerbar";
 		} else {
 			renewableString = "nicht erneuerbar";
 		}
+		if (!measurement.getRenewable().equals("true") && !measurement.getRenewable().equals("false")) {
+			renewableString = "mixed";
+		}
 		return Point.measurement(measurementName)
 				.time(measurement.getTimestamp().toEpochMilli(), WritePrecision.MS)
-				.addTag("deviceId", measurement.getDeviceId().toString())
-				.addTag("ownerId", measurement.getOwnerId().toString())
+				.addTag("deviceId", deviceId)
+				.addTag("ownerId", ownerId)
 				.addTag("powerType", measurement.getPowerType())
 				.addTag("renewable", renewableString)
 				.addField("kWh", measurement.getProduction());
@@ -118,7 +143,7 @@ public class InfluxDBService {
 		String fluxQueryCommercial = String.format(
 				"from(bucket: \"%s\") "
 						+ "|> range(start: -30d) "  // Bis zu 30 Tage zurück
-						+ "|> filter(fn: (r) => r._measurement == \"commercial_storages\") " // Measurement filtern
+						+ "|> filter(fn: (r) => r._measurement == \"storages_commercial\") " // Measurement filtern
 						+ "|> filter(fn: (r) => r.deviceId == \"%s\") " // deviceId filtern
 						+ "|> filter(fn: (r) => r._field == \"currentCharge\") " // Feld `currentCharge`
 						+ "|> last()",  // Nur den letzten Wert auswählen
