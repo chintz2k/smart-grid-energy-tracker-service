@@ -1,10 +1,9 @@
 package com.energytracker.quartz.jobs.consumer;
 
-import com.energytracker.entity.CommercialStorage;
 import com.energytracker.entity.Consumer;
-import com.energytracker.entity.Storage;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.quartz.util.QuartzIntervals;
+import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.service.GeneralDeviceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -20,8 +19,8 @@ public class ConsumerLoggerJob extends AbstractConsumerLoggerJob<Consumer> {
 	private final GeneralDeviceService<Consumer> consumerService;
 
 	@Autowired
-	public ConsumerLoggerJob(InfluxDBService influxDBService, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService, GeneralDeviceService<Consumer> consumerService) {
-		super(influxDBService, commercialStorageService, storageService);
+	public ConsumerLoggerJob(InfluxDBService influxDBService, StorageHandler storageHandler, GeneralDeviceService<Consumer> consumerService) {
+		super(influxDBService, storageHandler);
 		this.consumerService = consumerService;
 	}
 

@@ -1,11 +1,12 @@
 package com.energytracker.quartz.jobs.producer;
 
 import com.energytracker.dto.WeatherResponse;
-import com.energytracker.entity.*;
+import com.energytracker.entity.BaseProducer;
+import com.energytracker.entity.CommercialProducer;
+import com.energytracker.entity.Producer;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.influx.measurements.ProductionMeasurement;
-import com.energytracker.influx.measurements.StorageMeasurement;
-import com.energytracker.service.GeneralDeviceService;
+import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.webclients.WeatherApiClient;
 import org.jetbrains.annotations.Nullable;
 import org.quartz.Job;
@@ -22,7 +23,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * @author André Heinen
@@ -36,8 +36,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 
 	private final InfluxDBService influxDBService;
 	private final WeatherApiClient weatherApiClient;
-	private final GeneralDeviceService<CommercialStorage> commercialStorageService;
-	private final GeneralDeviceService<Storage> storageService;
+	private final StorageHandler storageHandler;
 
 	protected abstract List<T> getActiveProducers();
 	protected abstract T getProducerById(Long id);
@@ -50,11 +49,10 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	private double windPowerModificator = 1.0;
 
 	@Autowired
-	public AbstractProducerLoggerJob(InfluxDBService influxDBService, WeatherApiClient weatherApiClient, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService) {
+	public AbstractProducerLoggerJob(InfluxDBService influxDBService, WeatherApiClient weatherApiClient, StorageHandler storageHandler) {
 		this.influxDBService = influxDBService;
 		this.weatherApiClient = weatherApiClient;
-		this.commercialStorageService = commercialStorageService;
-		this.storageService = storageService;
+		this.storageHandler = storageHandler;
 	}
 
 	@Override
@@ -65,8 +63,6 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		List<T> updatedProducers = Collections.synchronizedList(new ArrayList<>());
 		List<T> removedProducers = Collections.synchronizedList(new ArrayList<>());
 		Map<Long, List<ProductionMeasurement>> ownerProductionData = new ConcurrentHashMap<>();
-		List<StorageMeasurement> commercialStorageMeasurements = Collections.synchronizedList(new ArrayList<>());
-		List<StorageMeasurement> storageMeasurements = Collections.synchronizedList(new ArrayList<>());
 
 		WeatherResponse response = weatherApiClient.getWeather();
 		if (response != null) {
@@ -77,13 +73,13 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		processSyncedInBatches(activeProducers, measurementsBatch, updatedProducers, removedProducers, ownerProductionData);
 
 		Map<Long, Double> totalProductionOfOwnerMap = getTotalProductionByOwnerAsMap(ownerProductionData);
-		updateStorages(commercialStorageMeasurements, storageMeasurements, totalProductionOfOwnerMap);
+		storageHandler.updateStorages(totalProductionOfOwnerMap, false);
 
 		List<ProductionMeasurement> totalProductionByOwnerAndPowerTypeAndTimestamp = calculateTotalProductionByOwnerAndPowerTypeAndTimestamp(ownerProductionData);
 		List<ProductionMeasurement> totalProductionByOwnerAndByTimestamp = calculateTotalProductionByOwnerAndTimestamp(ownerProductionData);
 		List<ProductionMeasurement> totalProductionByPowerTypeAndTimestamp = calculateTotalProductionByPowerTypeAndTimestamp(ownerProductionData);
 		List<ProductionMeasurement> totalProductionByTimestamp = calculateTotalProductionByTimestamp(ownerProductionData);
-		updateDatabase(updatedProducers, removedProducers, measurementsBatch, commercialStorageMeasurements, storageMeasurements, totalProductionByOwnerAndPowerTypeAndTimestamp, totalProductionByOwnerAndByTimestamp, totalProductionByPowerTypeAndTimestamp, totalProductionByTimestamp);
+		updateDatabase(updatedProducers, removedProducers, measurementsBatch, totalProductionByOwnerAndPowerTypeAndTimestamp, totalProductionByOwnerAndByTimestamp, totalProductionByPowerTypeAndTimestamp, totalProductionByTimestamp);
 	}
 
 	private void processSynced(
@@ -128,104 +124,10 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		}
 	}
 
-	private StorageMeasurement createStorageMeasurement(Instant time, Long deviceId, Long ownerId, double capacity, double currentCharge) {
-		StorageMeasurement measurement = new StorageMeasurement();
-		measurement.setTimestamp(time);
-		measurement.setDeviceId(deviceId.toString());
-		measurement.setOwnerId(ownerId.toString());
-		measurement.setCapacity(capacity);
-		measurement.setCurrentCharge(currentCharge);
-		return measurement;
-	}
-
-	private synchronized void updateStorages(
-			List<StorageMeasurement> commercialStorageMeasurements,
-			List<StorageMeasurement> storageMeasurements,
-			Map<Long, Double> totalProductionOfOwnerMap
-	) {
-
-		List<CommercialStorage> commercialStorages = commercialStorageService.getAll();
-		List<Storage> storages = storageService.getAll();
-
-		// 1. Gehe die Produktion pro Nutzer durch
-		for (Map.Entry<Long, Double> entry : totalProductionOfOwnerMap.entrySet()) {
-			Long ownerId = entry.getKey();
-			double production = entry.getValue();
-			double netProduction = production;
-
-			Instant time = Instant.now();
-
-			// 2. Hole die aktiven Storages des Nutzers aus den beiden Listen und sortiere sie nach chargingPriority (absteigend)
-			List<BaseStorage> ownerStorages = Stream.concat(commercialStorages.stream(), storages.stream())
-					.filter(storage -> storage.getOwnerId().equals(ownerId))
-					.sorted((a, b) -> Integer.compare(b.getChargingPriority(), a.getChargingPriority()))
-					.toList();
-
-			// 3. Produktion auf die Storages des Nutzers verteilen
-			for (BaseStorage storage : ownerStorages) {
-				double storageCurrentCharge = influxDBService.getCurrentChargeFromStorage(storage.getDeviceId());
-				System.out.println("OwnerStorage " + storage.getDeviceId() + " hat derzeit " + String.format("%.6f", storageCurrentCharge) + " kWh geladen.");
-				double capacity = storage.getCapacity();
-				if (netProduction > 0) {
-					double availableSpace = capacity - storageCurrentCharge;
-					double toStore = Math.min(netProduction, availableSpace);
-					double newCharge = storageCurrentCharge + toStore;
-
-					// Update der Produktion und Speicherladung
-					netProduction -= toStore;
-
-					// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
-					if (storage instanceof Storage) {
-						storageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-					} else if (storage instanceof CommercialStorage) {
-						commercialStorageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-					}
-				}
-			}
-
-			// 4. Überschüssige Produktion bei kommerziellen Storages speichern
-			if (netProduction > 0) {
-
-				// Nach Priorität sortieren (höchste zuerst)
-				commercialStorages.sort((a, b) -> Integer.compare(b.getChargingPriority(), a.getChargingPriority()));
-
-				// Ziehe Verbrauch von den kommerziellen Storages ab
-				for (BaseStorage storage : commercialStorages) {
-					double storageCurrentCharge = influxDBService.getCurrentChargeFromStorage(storage.getDeviceId());
-					System.out.println("CommercialStorage " + storage.getDeviceId() + " hat derzeit " + String.format("%.6f", storageCurrentCharge) + " kWh geladen.");
-					double capacity = storage.getCapacity();
-					if (netProduction > 0) {
-						double availableSpace = capacity - storageCurrentCharge;
-						double toStore = Math.min(netProduction, availableSpace);
-						double newCharge = storageCurrentCharge + toStore;
-
-						// Update der Produktion und Speicherladung
-						netProduction -= toStore;
-
-						// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
-						if (storage instanceof Storage) {
-							storageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-						} else if (storage instanceof CommercialStorage) {
-							commercialStorageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-						}
-					}
-				}
-			}
-
-			// Falls immer noch Rest übrig ist, loggen wir diesen, da er nicht abgedeckt werden konnte
-			if (netProduction > 0) {
-				System.out.println("Nicht genug Kapazität vorhanden. Dem NETZ wird " + String.format("%.6f", netProduction) + " kWh hinzugefügt.");
-				// TODO Hier wird der Rest später dem NETZ zugewiesen beziehungsweise abgezogen
-			}
-		}
-	}
-
 	private void updateDatabase(
 			List<T> updatedProducers,
 			List<T> removedProducers,
 			List<ProductionMeasurement> measurementsBatch,
-			List<StorageMeasurement> commercialStorageMeasurements,
-			List<StorageMeasurement> storageMeasurements,
 			List<ProductionMeasurement> totalProductionByOwnerAndPowerTypeAndTimestamp,
 			List<ProductionMeasurement> totalProductionOfOwnerByTimestamp,
 			List<ProductionMeasurement> totalProductionByPowerTypeAndTimestamp,
@@ -237,14 +139,6 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 
 		if (!measurementsBatch.isEmpty()) {
 			influxDBService.saveProductionMeasurements(measurementsBatch, getMeasurementName());
-		}
-
-		if (!commercialStorageMeasurements.isEmpty()) {
-			influxDBService.saveStorageMeasurements(commercialStorageMeasurements, "storages_commercial");
-		}
-
-		if (!storageMeasurements.isEmpty()) {
-			influxDBService.saveStorageMeasurements(storageMeasurements, "storages");
 		}
 
 		if (!totalProductionByOwnerAndPowerTypeAndTimestamp.isEmpty()) {

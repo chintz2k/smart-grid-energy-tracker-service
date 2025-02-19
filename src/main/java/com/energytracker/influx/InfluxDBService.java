@@ -1,6 +1,7 @@
 package com.energytracker.influx;
 
 import com.energytracker.influx.measurements.ConsumptionMeasurement;
+import com.energytracker.influx.measurements.NetMeasurement;
 import com.energytracker.influx.measurements.ProductionMeasurement;
 import com.energytracker.influx.measurements.StorageMeasurement;
 import com.influxdb.client.InfluxDBClient;
@@ -32,17 +33,15 @@ public class InfluxDBService {
 	private final String bucketConsumption = "energy_tracker";
 	private final String bucketProduction = "energy_tracker";
 	private final String bucketStorage = "energy_tracker";
+	private final String bucketNetMeasurement = "energy_tracker";
+
+	private final String netMeasurementName = "net_balance";
 
 	private final InfluxDBClient influxDBClient;
 
 	@Autowired
 	public InfluxDBService(InfluxDBClient influxDBClient) {
 		this.influxDBClient = influxDBClient;
-	}
-
-	public void saveTotalConsumptionMeasurement(ConsumptionMeasurement measurement) {
-		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
-		writeApi.writePoint(bucketConsumption, org, createConsumptionMeasurementPoint(measurement, "consumption_total"));
 	}
 
 	public void saveConsumptionMeasurements(List<ConsumptionMeasurement> measurements, @NotNull @NotBlank String measurementName) {
@@ -67,6 +66,14 @@ public class InfluxDBService {
 		}
 		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
 		measurements.forEach(measurement -> writeApi.writePoint(bucketStorage, org, createStorageMeasurementPoint(measurement, measurementName)));
+	}
+
+	public void saveNetMeasurement(NetMeasurement measurement, @NotNull @NotBlank String measurementName) {
+		if (measurement == null) {
+			return;
+		}
+		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
+		writeApi.writePoint(bucketNetMeasurement, org, createNetMeasurementPoint(measurement, measurementName));
 	}
 
 	private Point createConsumptionMeasurementPoint(ConsumptionMeasurement measurement, String measurementName) {
@@ -121,7 +128,14 @@ public class InfluxDBService {
 				.addField("currentCharge", measurement.getCurrentCharge());
 	}
 
-	private Double extractCurrentChargeFromResult(List<FluxTable> results) {
+	private Point createNetMeasurementPoint(NetMeasurement measurement, String measurementName) {
+		return Point.measurement(measurementName)
+				.time(measurement.getTimestamp().toEpochMilli(), WritePrecision.MS)
+				.addField("currentBalance", measurement.getCurrentBalance())
+				.addField("change", measurement.getChange());
+	}
+
+	private Double findFirstDoubleInFluxTables(List<FluxTable> results) {
 		if (results == null || results.isEmpty()) {
 			return null;
 		}
@@ -138,7 +152,7 @@ public class InfluxDBService {
 		return null;
 	}
 
-	public double getCurrentChargeFromStorage(Long deviceId) {
+	public synchronized double getCurrentChargeFromStorage(Long deviceId) {
 		// Query für das Measurement "commercial_storages"
 		String fluxQueryCommercial = String.format(
 				"from(bucket: \"%s\") "
@@ -163,23 +177,46 @@ public class InfluxDBService {
 
 		try {
 			List<FluxTable> commercialResults = influxDBClient.getQueryApi().query(fluxQueryCommercial);
-			Double commercialValue = extractCurrentChargeFromResult(commercialResults);
+			Double commercialValue = findFirstDoubleInFluxTables(commercialResults);
 			if (commercialValue != null) {
 				return commercialValue; // Erfolgreich gefunden
 			}
 
 			// Fallback: Abfrage in "storages"
 			List<FluxTable> storageResults = influxDBClient.getQueryApi().query(fluxQueryStorages);
-			Double storageValue = extractCurrentChargeFromResult(storageResults);
+			Double storageValue = findFirstDoubleInFluxTables(storageResults);
 			if (storageValue != null) {
 				return storageValue; // Erfolgreich gefunden
 			}
 
 			return 0.0; // Wenn kein Wert gefunden wurde, ist die Ladung 0.0
 		} catch (Exception e) {
-			logger.error("Fehler bei der Influx Query der Storages, 0.0 zurückgegeben", e);
+			logger.error("Fehler bei der Influx Query des Storage {}, 0.0 zurückgegeben", deviceId, e);
 			return 0.0; // Bei Fehlern einfach 0.0 zurückgeben und den Fehler loggen
 		}
+	}
 
+	public synchronized double getCurrentBalanceFromNetMeasurement() {
+		String fluxQuery = String.format(
+				"from(bucket: \"%s\") "
+						+ "|> range(start: -30d) "
+						+ "|> filter(fn: (r) => r._measurement == \"%s\") "
+						+ "|> filter(fn: (r) => r._field == \"currentBalance\") "
+						+ "|> last()",
+				bucketNetMeasurement, netMeasurementName
+		);
+
+		try {
+			List<FluxTable> results = influxDBClient.getQueryApi().query(fluxQuery);
+			Double currentBalance = findFirstDoubleInFluxTables(results);
+			if (currentBalance != null) {
+				return currentBalance;
+			}
+
+			return 0.0; // Wenn kein Wert gefunden wurde, ist die Ladung 0.0
+		} catch (Exception e) {
+			logger.error("Fehler bei der Influx Query der NetBalance, 0.0 zurückgegeben", e);
+			return 0.0;
+		}
 	}
 }
