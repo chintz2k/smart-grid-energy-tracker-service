@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
@@ -29,7 +28,7 @@ public class StorageHandler {
 
 	private static final Logger logger = LoggerFactory.getLogger(StorageHandler.class);
 
-	private static final Lock lock = new ReentrantLock();
+	private static final ReentrantLock lock = new ReentrantLock(true);
 
 	private final InfluxDBService influxDBService;
 	private final GeneralDeviceService<CommercialStorage> commercialStorageService;
