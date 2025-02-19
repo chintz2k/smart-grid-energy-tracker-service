@@ -44,6 +44,13 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
 	}
 
+	@ExceptionHandler(InvalidTimeFormatForInflux.class)
+	public ResponseEntity<Map<String, String>> handleInvalidTimeFormatForInflux(InvalidTimeFormatForInflux ex, WebRequest request) {
+		Map<String, String> error = new HashMap<>();
+		error.put("error", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+	}
+
 	@ExceptionHandler(NoHandlerFoundException.class)
 	public ResponseEntity<Map<String, String>> handleNotFound(NoHandlerFoundException ex) {
 		Map<String, String> errors = new HashMap<>();

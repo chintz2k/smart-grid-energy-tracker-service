@@ -28,15 +28,6 @@ public class InfluxDBService {
 
 	private static final Logger logger = LoggerFactory.getLogger(InfluxDBService.class);
 
-	private final String org = "chintz_de";
-
-	private final String bucketConsumption = "energy_tracker";
-	private final String bucketProduction = "energy_tracker";
-	private final String bucketStorage = "energy_tracker";
-	private final String bucketNetMeasurement = "energy_tracker";
-
-	private final String netMeasurementName = "net_balance";
-
 	private final InfluxDBClient influxDBClient;
 
 	@Autowired
@@ -49,7 +40,7 @@ public class InfluxDBService {
 			return;
 		}
 		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
-		measurements.forEach(measurement -> writeApi.writePoint(bucketConsumption, org, createConsumptionMeasurementPoint(measurement, measurementName)));
+		measurements.forEach(measurement -> writeApi.writePoint(InfluxConstants.BUCKET_CONSUMPTION, InfluxConstants.ORG_NAME, createConsumptionMeasurementPoint(measurement, measurementName)));
 	}
 
 	public void saveProductionMeasurements(List<ProductionMeasurement> measurements, @NotNull @NotBlank String measurementName) {
@@ -57,7 +48,7 @@ public class InfluxDBService {
 			return;
 		}
 		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
-		measurements.forEach(measurement -> writeApi.writePoint(bucketProduction, org, createProductionMeasurementPoint(measurement, measurementName)));
+		measurements.forEach(measurement -> writeApi.writePoint(InfluxConstants.BUCKET_PRODUCTION, InfluxConstants.ORG_NAME, createProductionMeasurementPoint(measurement, measurementName)));
 	}
 
 	public void saveStorageMeasurements(List<StorageMeasurement> measurements, @NotNull @NotBlank String measurementName) {
@@ -65,7 +56,7 @@ public class InfluxDBService {
 			return;
 		}
 		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
-		measurements.forEach(measurement -> writeApi.writePoint(bucketStorage, org, createStorageMeasurementPoint(measurement, measurementName)));
+		measurements.forEach(measurement -> writeApi.writePoint(InfluxConstants.BUCKET_STORAGE, InfluxConstants.ORG_NAME, createStorageMeasurementPoint(measurement, measurementName)));
 	}
 
 	public void saveNetMeasurement(NetMeasurement measurement, @NotNull @NotBlank String measurementName) {
@@ -73,7 +64,7 @@ public class InfluxDBService {
 			return;
 		}
 		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
-		writeApi.writePoint(bucketNetMeasurement, org, createNetMeasurementPoint(measurement, measurementName));
+		writeApi.writePoint(InfluxConstants.BUCKET_NET, InfluxConstants.ORG_NAME, createNetMeasurementPoint(measurement, measurementName));
 	}
 
 	private Point createConsumptionMeasurementPoint(ConsumptionMeasurement measurement, String measurementName) {
@@ -161,7 +152,7 @@ public class InfluxDBService {
 						+ "|> filter(fn: (r) => r.deviceId == \"%s\") " // deviceId filtern
 						+ "|> filter(fn: (r) => r._field == \"currentCharge\") " // Feld `currentCharge`
 						+ "|> last()",  // Nur den letzten Wert auswählen
-				bucketStorage, deviceId
+				InfluxConstants.BUCKET_STORAGE, deviceId
 		);
 
 		// Query für das Measurement "storages"
@@ -172,7 +163,7 @@ public class InfluxDBService {
 						+ "|> filter(fn: (r) => r.deviceId == \"%s\") "
 						+ "|> filter(fn: (r) => r._field == \"currentCharge\") "
 						+ "|> last()",
-				bucketStorage, deviceId
+				InfluxConstants.BUCKET_STORAGE, deviceId
 		);
 
 		try {
@@ -203,7 +194,7 @@ public class InfluxDBService {
 						+ "|> filter(fn: (r) => r._measurement == \"%s\") "
 						+ "|> filter(fn: (r) => r._field == \"currentBalance\") "
 						+ "|> last()",
-				bucketNetMeasurement, netMeasurementName
+				InfluxConstants.BUCKET_NET, InfluxConstants.MEASUREMENT_NAME_NET
 		);
 
 		try {
@@ -218,5 +209,38 @@ public class InfluxDBService {
 			logger.error("Fehler bei der Influx Query der NetBalance, 0.0 zurückgegeben", e);
 			return 0.0;
 		}
+	}
+
+	public Long getDeviceOwnerId(Long deviceId) {
+		List<String> buckets = List.of(
+				InfluxConstants.BUCKET_CONSUMPTION,
+				InfluxConstants.BUCKET_PRODUCTION,
+				InfluxConstants.BUCKET_STORAGE
+		);
+
+		for (String bucket : buckets) {
+			String fluxQuery = String.format(
+					"from(bucket: \"%s\") "
+							+ "|> range(start: -1y) "
+							+ "|> filter(fn: (r) => r.deviceId == \"%s\") "
+							+ "|> keep(columns: [\"ownerId\"]) "
+							+ "|> limit(n: 1)",
+					bucket, deviceId
+			);
+
+			List<FluxTable> tables = influxDBClient.getQueryApi().query(fluxQuery);
+			if (tables != null && !tables.isEmpty()) {
+				for (FluxTable table : tables) {
+					List<FluxRecord> records = table.getRecords();
+					if (records != null && !records.isEmpty()) {
+						Object ownerIdObj = records.get(0).getValueByKey("ownerId");
+						if (ownerIdObj != null) {
+							return Long.valueOf(ownerIdObj.toString());
+						}
+					}
+				}
+			}
+		}
+		throw new IllegalStateException("Kein OwnerId für deviceId " + deviceId + " in den Buckets gefunden.");
 	}
 }

@@ -1,6 +1,7 @@
 package com.energytracker.quartz.jobs.producer;
 
 import com.energytracker.entity.CommercialProducer;
+import com.energytracker.influx.InfluxConstants;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
@@ -37,7 +38,7 @@ public class CommercialProducerLoggerJob extends AbstractProducerLoggerJob<Comme
 
 	@Override
 	protected String getMeasurementName() {
-		return "production_device_commercial";
+		return InfluxConstants.MEASUREMENT_NAME_PRODUCTION_DEVICE;
 	}
 
 	@Override

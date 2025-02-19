@@ -47,4 +47,18 @@ public class SecurityService {
 
 		throw new UnauthorizedAccessException("Invalid user ID in authentication context");
 	}
+
+	public String getCurrentUserRole() {
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		if (authentication == null || authentication.getPrincipal() == null) {
+			throw new UnauthorizedAccessException("User is not authenticated");
+		}
+
+		if (authentication instanceof UsernamePasswordAuthenticationToken) {
+			String token = authentication.getCredentials().toString();
+			return jwtUtil.extractRole(token);
+		}
+
+		throw new UnauthorizedAccessException("Invalid authentication context, cannot extract role");
+	}
 }

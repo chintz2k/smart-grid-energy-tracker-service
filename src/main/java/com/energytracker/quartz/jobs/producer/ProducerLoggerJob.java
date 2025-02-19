@@ -1,6 +1,7 @@
 package com.energytracker.quartz.jobs.producer;
 
 import com.energytracker.entity.Producer;
+import com.energytracker.influx.InfluxConstants;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
@@ -37,7 +38,7 @@ public class ProducerLoggerJob extends AbstractProducerLoggerJob<Producer> {
 
 	@Override
 	protected String getMeasurementName() {
-		return "production_device";
+		return InfluxConstants.MEASUREMENT_NAME_PRODUCTION_DEVICE;
 	}
 
 	@Override

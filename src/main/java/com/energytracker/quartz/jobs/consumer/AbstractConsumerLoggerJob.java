@@ -3,6 +3,7 @@ package com.energytracker.quartz.jobs.consumer;
 import com.energytracker.entity.BaseConsumer;
 import com.energytracker.entity.CommercialConsumer;
 import com.energytracker.entity.Consumer;
+import com.energytracker.influx.InfluxConstants;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.influx.measurements.ConsumptionMeasurement;
 import com.energytracker.quartz.util.StorageHandler;
@@ -127,11 +128,11 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		}
 
 		if (!totalConsumptionOfOwnerByTimestamp.isEmpty()) {
-			influxDBService.saveConsumptionMeasurements(totalConsumptionOfOwnerByTimestamp, "consumption_owner");
+			influxDBService.saveConsumptionMeasurements(totalConsumptionOfOwnerByTimestamp, InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_OWNER);
 		}
 
 		if (!totalConsumptionByTimestamp.isEmpty()) {
-			influxDBService.saveConsumptionMeasurements(totalConsumptionByTimestamp, "consumption_total");
+			influxDBService.saveConsumptionMeasurements(totalConsumptionByTimestamp, InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_TOTAL);
 		}
 
 		if (!removedConsumers.isEmpty()) {

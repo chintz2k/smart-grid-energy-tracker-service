@@ -4,6 +4,7 @@ import com.energytracker.dto.WeatherResponse;
 import com.energytracker.entity.BaseProducer;
 import com.energytracker.entity.CommercialProducer;
 import com.energytracker.entity.Producer;
+import com.energytracker.influx.InfluxConstants;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.influx.measurements.ProductionMeasurement;
 import com.energytracker.quartz.util.StorageHandler;
@@ -142,19 +143,19 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		}
 
 		if (!totalProductionByOwnerAndPowerTypeAndTimestamp.isEmpty()) {
-			influxDBService.saveProductionMeasurements(totalProductionByOwnerAndPowerTypeAndTimestamp, "production_owner");
+			influxDBService.saveProductionMeasurements(totalProductionByOwnerAndPowerTypeAndTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
 		}
 
 		if (!totalProductionOfOwnerByTimestamp.isEmpty()) {
-			influxDBService.saveProductionMeasurements(totalProductionOfOwnerByTimestamp, "production_owner");
+			influxDBService.saveProductionMeasurements(totalProductionOfOwnerByTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
 		}
 
 		if (!totalProductionByPowerTypeAndTimestamp.isEmpty()) {
-			influxDBService.saveProductionMeasurements(totalProductionByPowerTypeAndTimestamp, "production_total");
+			influxDBService.saveProductionMeasurements(totalProductionByPowerTypeAndTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
 		}
 
 		if (!totalProductionByTimestamp.isEmpty()) {
-			influxDBService.saveProductionMeasurements(totalProductionByTimestamp, "production_total");
+			influxDBService.saveProductionMeasurements(totalProductionByTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
 		}
 
 		if (!removedProducers.isEmpty()) {

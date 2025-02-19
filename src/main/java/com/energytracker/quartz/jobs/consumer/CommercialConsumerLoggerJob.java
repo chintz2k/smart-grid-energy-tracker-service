@@ -1,6 +1,7 @@
 package com.energytracker.quartz.jobs.consumer;
 
 import com.energytracker.entity.CommercialConsumer;
+import com.energytracker.influx.InfluxConstants;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
@@ -36,7 +37,7 @@ public class CommercialConsumerLoggerJob extends AbstractConsumerLoggerJob<Comme
 
 	@Override
 	protected String getMeasurementName() {
-		return "consumption_device_commercial";
+		return InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_DEVICE;
 	}
 
 	@Override

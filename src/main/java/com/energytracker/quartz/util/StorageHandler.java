@@ -3,6 +3,7 @@ package com.energytracker.quartz.util;
 import com.energytracker.entity.BaseStorage;
 import com.energytracker.entity.CommercialStorage;
 import com.energytracker.entity.Storage;
+import com.energytracker.influx.InfluxConstants;
 import com.energytracker.influx.InfluxDBService;
 import com.energytracker.influx.measurements.NetMeasurement;
 import com.energytracker.influx.measurements.StorageMeasurement;
@@ -235,15 +236,15 @@ public class StorageHandler {
 	private void updateDatabase(List<StorageMeasurement> commercialStorageMeasurements, List<StorageMeasurement> storageMeasurements, NetMeasurement netMeasurement) {
 
 		if (!commercialStorageMeasurements.isEmpty()) {
-			influxDBService.saveStorageMeasurements(commercialStorageMeasurements, "storages_commercial");
+			influxDBService.saveStorageMeasurements(commercialStorageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL);
 		}
 
 		if (!storageMeasurements.isEmpty()) {
-			influxDBService.saveStorageMeasurements(storageMeasurements, "storages");
+			influxDBService.saveStorageMeasurements(storageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE);
 		}
 
 		if (netMeasurement != null) {
-			influxDBService.saveNetMeasurement(netMeasurement, "net_balance");
+			influxDBService.saveNetMeasurement(netMeasurement, InfluxConstants.MEASUREMENT_NAME_NET);
 		}
 	}
 }
