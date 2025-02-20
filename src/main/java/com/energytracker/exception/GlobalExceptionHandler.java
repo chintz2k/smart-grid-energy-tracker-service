@@ -44,6 +44,20 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
 	}
 
+	@ExceptionHandler(InvalidFluxQueryFilter.class)
+	public ResponseEntity<Map<String, String>> handleInvalidFluxQueryFilter(InvalidFluxQueryFilter ex, WebRequest request) {
+		Map<String, String> error = new HashMap<>();
+		error.put("error", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+	}
+
+	@ExceptionHandler(InvalidInfluxAggregationType.class)
+	public ResponseEntity<Map<String, String>> handleInvalidInfluxAggregationType(InvalidInfluxAggregationType ex, WebRequest request) {
+		Map<String, String> error = new HashMap<>();
+		error.put("error", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+	}
+
 	@ExceptionHandler(InvalidTimeFormatForInflux.class)
 	public ResponseEntity<Map<String, String>> handleInvalidTimeFormatForInflux(InvalidTimeFormatForInflux ex, WebRequest request) {
 		Map<String, String> error = new HashMap<>();

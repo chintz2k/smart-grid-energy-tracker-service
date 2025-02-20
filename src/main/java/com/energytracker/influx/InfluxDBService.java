@@ -148,22 +148,22 @@ public class InfluxDBService {
 		String fluxQueryCommercial = String.format(
 				"from(bucket: \"%s\") "
 						+ "|> range(start: -30d) "  // Bis zu 30 Tage zurück
-						+ "|> filter(fn: (r) => r._measurement == \"storages_commercial\") " // Measurement filtern
+						+ "|> filter(fn: (r) => r._measurement == \"%s\") " // Measurement filtern
 						+ "|> filter(fn: (r) => r.deviceId == \"%s\") " // deviceId filtern
 						+ "|> filter(fn: (r) => r._field == \"currentCharge\") " // Feld `currentCharge`
 						+ "|> last()",  // Nur den letzten Wert auswählen
-				InfluxConstants.BUCKET_STORAGE, deviceId
+				InfluxConstants.BUCKET_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL, deviceId
 		);
 
 		// Query für das Measurement "storages"
 		String fluxQueryStorages = String.format(
 				"from(bucket: \"%s\") "
 						+ "|> range(start: -30d) "
-						+ "|> filter(fn: (r) => r._measurement == \"storages\") "
+						+ "|> filter(fn: (r) => r._measurement == \"%s\") "
 						+ "|> filter(fn: (r) => r.deviceId == \"%s\") "
 						+ "|> filter(fn: (r) => r._field == \"currentCharge\") "
 						+ "|> last()",
-				InfluxConstants.BUCKET_STORAGE, deviceId
+				InfluxConstants.BUCKET_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE, deviceId
 		);
 
 		try {

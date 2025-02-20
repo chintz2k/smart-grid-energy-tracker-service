@@ -27,10 +27,11 @@ public class NetBalanceController {
 	@RequestMapping("/chart")
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
 	public ResponseEntity<Map<String, Object>> getNetBalanceMeasurementsForChartJs(
-			@RequestParam(defaultValue = "10m") String range,
-			@RequestParam(defaultValue = "none") String aggregation
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String aggregationTime,
+			@RequestParam(required = false) String aggregationType
 	) {
-		Map<String, Object> mapForChartJs = netBalanceService.getNetBalanceMeasurementsForChartJs(range, aggregation);
+		Map<String, Object> mapForChartJs = netBalanceService.getNetBalanceMeasurementsForChartJs(range, aggregationTime, aggregationType);
 
 		return ResponseEntity.ok().body(mapForChartJs);
 	}

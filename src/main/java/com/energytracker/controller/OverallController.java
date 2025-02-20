@@ -28,10 +28,11 @@ public class OverallController {
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
 	public ResponseEntity<Map<String, Object>> getOverallMeasurementsForChartJs(
 			@RequestParam String type,
-			@RequestParam(defaultValue = "10m") String range,
-			@RequestParam(defaultValue = "none") String aggregation
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String aggregationTime,
+			@RequestParam(required = false) String aggregationType
 	) {
-		Map<String, Object> mapForChartJs = overallService.getOverallMeasurementsForChartJs(type, range, aggregation);
+		Map<String, Object> mapForChartJs = overallService.getOverallMeasurementsForChartJs(type, range, aggregationTime, aggregationType);
 
 		return ResponseEntity.ok().body(mapForChartJs);
 	}

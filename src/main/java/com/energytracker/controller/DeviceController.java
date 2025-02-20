@@ -28,10 +28,11 @@ public class DeviceController {
 	public ResponseEntity<Map<String, Object>> getDeviceMeasurementsForChartJs(
 			@PathVariable Long deviceId,
 			@RequestParam String type,
-			@RequestParam(defaultValue = "10m") String range,
-			@RequestParam(defaultValue = "none") String aggregation
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String aggregationTime,
+			@RequestParam(required = false) String aggregationType
 	) {
-		Map<String, Object> mapforChartJs = deviceService.getDeviceMeasurementsForChartJs(deviceId, type, range, aggregation);
+		Map<String, Object> mapforChartJs = deviceService.getDeviceMeasurementsForChartJs(deviceId, type, range, aggregationTime, aggregationType);
 
 		return ResponseEntity.ok().body(mapforChartJs);
 	}
