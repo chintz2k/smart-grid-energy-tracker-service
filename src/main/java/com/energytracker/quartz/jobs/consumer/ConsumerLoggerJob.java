@@ -1,8 +1,8 @@
 package com.energytracker.quartz.jobs.consumer;
 
 import com.energytracker.entity.Consumer;
-import com.energytracker.influx.InfluxConstants;
-import com.energytracker.influx.InfluxDBService;
+import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.service.GeneralDeviceService;
@@ -20,8 +20,8 @@ public class ConsumerLoggerJob extends AbstractConsumerLoggerJob<Consumer> {
 	private final GeneralDeviceService<Consumer> consumerService;
 
 	@Autowired
-	public ConsumerLoggerJob(InfluxDBService influxDBService, StorageHandler storageHandler, GeneralDeviceService<Consumer> consumerService) {
-		super(influxDBService, storageHandler);
+	public ConsumerLoggerJob(InfluxMeasurementService influxMeasurementService, StorageHandler storageHandler, GeneralDeviceService<Consumer> consumerService) {
+		super(influxMeasurementService, storageHandler);
 		this.consumerService = consumerService;
 	}
 

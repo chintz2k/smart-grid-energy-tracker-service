@@ -3,9 +3,9 @@ package com.energytracker.quartz.jobs.consumer;
 import com.energytracker.entity.BaseConsumer;
 import com.energytracker.entity.CommercialConsumer;
 import com.energytracker.entity.Consumer;
-import com.energytracker.influx.InfluxConstants;
-import com.energytracker.influx.InfluxDBService;
 import com.energytracker.influx.measurements.ConsumptionMeasurement;
+import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.StorageHandler;
 import org.jetbrains.annotations.Nullable;
 import org.quartz.Job;
@@ -35,7 +35,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 
 	private static final int BATCH_SIZE = 500;
 
-	private final InfluxDBService influxDBService;
+	private final InfluxMeasurementService influxMeasurementService;
 	private final StorageHandler storageHandler;
 
 	protected abstract List<T> getActiveConsumers();
@@ -46,8 +46,8 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	protected abstract int getIntervalInSeconds();
 
 	@Autowired
-	public AbstractConsumerLoggerJob(InfluxDBService influxDBService, StorageHandler storageHandler) {
-		this.influxDBService = influxDBService;
+	public AbstractConsumerLoggerJob(InfluxMeasurementService influxMeasurementService, StorageHandler storageHandler) {
+		this.influxMeasurementService = influxMeasurementService;
 		this.storageHandler = storageHandler;
 	}
 
@@ -124,15 +124,15 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		}
 
 		if (!measurementsBatch.isEmpty()) {
-			influxDBService.saveConsumptionMeasurements(measurementsBatch, getMeasurementName());
+			influxMeasurementService.saveConsumptionMeasurements(measurementsBatch, getMeasurementName());
 		}
 
 		if (!totalConsumptionOfOwnerByTimestamp.isEmpty()) {
-			influxDBService.saveConsumptionMeasurements(totalConsumptionOfOwnerByTimestamp, InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_OWNER);
+			influxMeasurementService.saveConsumptionMeasurements(totalConsumptionOfOwnerByTimestamp, InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_OWNER);
 		}
 
 		if (!totalConsumptionByTimestamp.isEmpty()) {
-			influxDBService.saveConsumptionMeasurements(totalConsumptionByTimestamp, InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_TOTAL);
+			influxMeasurementService.saveConsumptionMeasurements(totalConsumptionByTimestamp, InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_TOTAL);
 		}
 
 		if (!removedConsumers.isEmpty()) {

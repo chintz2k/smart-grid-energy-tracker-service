@@ -1,6 +1,6 @@
 package com.energytracker.controller;
 
-import com.energytracker.influx.InfluxNetBalanceService;
+import com.energytracker.influx.service.InfluxNetBalanceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,10 +28,18 @@ public class NetBalanceController {
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
 	public ResponseEntity<Map<String, Object>> getNetBalanceMeasurementsForChartJs(
 			@RequestParam(required = false) String range,
-			@RequestParam(required = false) String aggregationTime,
-			@RequestParam(required = false) String aggregationType
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType
 	) {
-		Map<String, Object> mapForChartJs = netBalanceService.getNetBalanceMeasurementsForChartJs(range, aggregationTime, aggregationType);
+		Map<String, Object> mapForChartJs = netBalanceService.getNetBalanceMeasurementsForChartJs(
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType
+		);
 
 		return ResponseEntity.ok().body(mapForChartJs);
 	}

@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * @author André Heinen
@@ -35,6 +37,18 @@ public abstract class GeneralDeviceServiceImpl<T extends BaseDevice, R extends J
 	@Transactional(readOnly = true)
 	public List<T> getAll() {
 		return repository.findAll();
+	}
+
+	@Override
+	@Cacheable("devicesIds")
+	@Transactional(readOnly = true)
+	public Set<Long> getAllDeviceIds() {
+		Set<Long> idList = new HashSet<>();
+		List<T> deviceList = getAll();
+		for (T device : deviceList) {
+			idList.add(device.getDeviceId());
+		}
+		return idList;
 	}
 
 	@Override

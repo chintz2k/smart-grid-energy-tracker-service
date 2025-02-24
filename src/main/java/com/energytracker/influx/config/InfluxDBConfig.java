@@ -1,4 +1,4 @@
-package com.energytracker.influx;
+package com.energytracker.influx.config;
 
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.InfluxDBClientFactory;

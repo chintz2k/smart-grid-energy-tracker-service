@@ -51,6 +51,20 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
 	}
 
+	@ExceptionHandler(InvalidPowerTypeException.class)
+	public ResponseEntity<Map<String, String>> handleInvalidPowerTypeException(InvalidPowerTypeException ex, WebRequest request) {
+		Map<String, String> error = new HashMap<>();
+		error.put("error", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+	}
+
+	@ExceptionHandler(InvalidRenewableValueException.class)
+	public ResponseEntity<Map<String, String>> handleInvalidRenewableValueException(InvalidRenewableValueException ex, WebRequest request) {
+		Map<String, String> error = new HashMap<>();
+		error.put("error", ex.getMessage());
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+	}
+
 	@ExceptionHandler(InvalidInfluxAggregationType.class)
 	public ResponseEntity<Map<String, String>> handleInvalidInfluxAggregationType(InvalidInfluxAggregationType ex, WebRequest request) {
 		Map<String, String> error = new HashMap<>();

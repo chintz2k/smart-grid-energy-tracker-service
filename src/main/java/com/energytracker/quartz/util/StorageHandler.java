@@ -3,10 +3,10 @@ package com.energytracker.quartz.util;
 import com.energytracker.entity.BaseStorage;
 import com.energytracker.entity.CommercialStorage;
 import com.energytracker.entity.Storage;
-import com.energytracker.influx.InfluxConstants;
-import com.energytracker.influx.InfluxDBService;
 import com.energytracker.influx.measurements.NetMeasurement;
 import com.energytracker.influx.measurements.StorageMeasurement;
+import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.service.GeneralDeviceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,13 +31,13 @@ public class StorageHandler {
 
 	private static final ReentrantLock lock = new ReentrantLock(true);
 
-	private final InfluxDBService influxDBService;
+	private final InfluxMeasurementService influxMeasurementService;
 	private final GeneralDeviceService<CommercialStorage> commercialStorageService;
 	private final GeneralDeviceService<Storage> storageService;
 
 	@Autowired
-	public StorageHandler(InfluxDBService influxDBService, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService) {
-		this.influxDBService = influxDBService;
+	public StorageHandler(InfluxMeasurementService influxMeasurementService, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService) {
+		this.influxMeasurementService = influxMeasurementService;
 		this.commercialStorageService = commercialStorageService;
 		this.storageService = storageService;
 	}
@@ -76,6 +76,8 @@ public class StorageHandler {
 			double consumption = entry.getValue();
 			double netConsumption = consumption;
 
+//			System.out.println("Consumption: " + consumption + " for owner: " + ownerId);
+
 			Instant time = Instant.now();
 
 			// 2. Hole die aktiven Storages des Nutzers aus den beiden Listen und sortiere sie nach consumingPriority (absteigend)
@@ -85,21 +87,7 @@ public class StorageHandler {
 					.toList();
 
 			// 3. Ziehe Verbrauch von den Benutzer-Storages ab
-			for (BaseStorage storage : ownerStorages) {
-				double storageCurrentCharge = influxDBService.getCurrentChargeFromStorage(storage.getDeviceId());
-				if (netConsumption > 0) {
-					double newCharge = Math.max(0, storageCurrentCharge - netConsumption);
-					double consumed = storageCurrentCharge - newCharge;
-					netConsumption -= consumed;
-
-					// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
-					if (storage instanceof Storage) {
-						storageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-					} else if (storage instanceof CommercialStorage) {
-						commercialStorageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-					}
-				}
-			}
+			netConsumption = goThroughStoragesForConsumption(ownerStorages, netConsumption, storageMeasurements, commercialStorageMeasurements, time);
 
 			// 4. Wenn Benutzer keine Storages hat oder die Kapazität nicht ausreicht
 			if (netConsumption > 0) {
@@ -108,28 +96,14 @@ public class StorageHandler {
 				commercialStorages.sort((a, b) -> Integer.compare(b.getConsumingPriority(), a.getConsumingPriority()));
 
 				// Ziehe Verbrauch von den kommerziellen Storages ab
-				for (BaseStorage storage : commercialStorages) {
-					double storageCurrentCharge = influxDBService.getCurrentChargeFromStorage(storage.getDeviceId());
-					if (netConsumption > 0) {
-						double newCharge = Math.max(0, storageCurrentCharge - netConsumption);
-						double consumed = storageCurrentCharge - newCharge;
-						netConsumption -= consumed;
-
-						// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
-						if (storage instanceof Storage) {
-							storageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-						} else if (storage instanceof CommercialStorage) {
-							commercialStorageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-						}
-					}
-				}
+				netConsumption = goThroughStoragesForConsumption(commercialStorages, netConsumption, storageMeasurements, commercialStorageMeasurements, time);
 			}
 
 			// Falls immer noch Rest übrig ist, loggen wir diesen, da er nicht abgedeckt werden konnte
 			if (netConsumption > 0) {
 				measurement = new NetMeasurement();
 				measurement.setTimestamp(time);
-				double netBalance = influxDBService.getCurrentBalanceFromNetMeasurement();
+				double netBalance = influxMeasurementService.getCurrentBalanceFromNetMeasurement();
 				netBalance -= netConsumption;
 				double netProductionChange = netConsumption * (-1.0);
 				measurement.setCurrentBalance(netBalance);
@@ -153,6 +127,8 @@ public class StorageHandler {
 			double production = entry.getValue();
 			double netProduction = production;
 
+//			System.out.println("Production: " + production + " for owner: " + ownerId);
+
 			Instant time = Instant.now();
 
 			// 2. Hole die aktiven Storages des Nutzers aus den beiden Listen und sortiere sie nach chargingPriority (absteigend)
@@ -162,25 +138,7 @@ public class StorageHandler {
 					.toList();
 
 			// 3. Produktion auf die Storages des Nutzers verteilen
-			for (BaseStorage storage : ownerStorages) {
-				double storageCurrentCharge = influxDBService.getCurrentChargeFromStorage(storage.getDeviceId());
-				double capacity = storage.getCapacity();
-				if (netProduction > 0) {
-					double availableSpace = capacity - storageCurrentCharge;
-					double toStore = Math.min(netProduction, availableSpace);
-					double newCharge = storageCurrentCharge + toStore;
-
-					// Update der Produktion und Speicherladung
-					netProduction -= toStore;
-
-					// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
-					if (storage instanceof Storage) {
-						storageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-					} else if (storage instanceof CommercialStorage) {
-						commercialStorageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-					}
-				}
-			}
+			netProduction = goThroughStoragesForProduction(ownerStorages, netProduction, storageMeasurements, commercialStorageMeasurements, time);
 
 			// 4. Überschüssige Produktion bei kommerziellen Storages speichern
 			if (netProduction > 0) {
@@ -189,38 +147,62 @@ public class StorageHandler {
 				commercialStorages.sort((a, b) -> Integer.compare(b.getChargingPriority(), a.getChargingPriority()));
 
 				// Ziehe Verbrauch von den kommerziellen Storages ab
-				for (BaseStorage storage : commercialStorages) {
-					double storageCurrentCharge = influxDBService.getCurrentChargeFromStorage(storage.getDeviceId());
-					double capacity = storage.getCapacity();
-					if (netProduction > 0) {
-						double availableSpace = capacity - storageCurrentCharge;
-						double toStore = Math.min(netProduction, availableSpace);
-						double newCharge = storageCurrentCharge + toStore;
-
-						// Update der Produktion und Speicherladung
-						netProduction -= toStore;
-
-						// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
-						if (storage instanceof Storage) {
-							storageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-						} else if (storage instanceof CommercialStorage) {
-							commercialStorageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
-						}
-					}
-				}
+				netProduction = goThroughStoragesForProduction(commercialStorages, netProduction, storageMeasurements, commercialStorageMeasurements, time);
 			}
 
 			// Falls immer noch Rest übrig ist, loggen wir diesen, da er nicht abgedeckt werden konnte
 			if (netProduction > 0) {
 				measurement = new NetMeasurement();
 				measurement.setTimestamp(time);
-				double netBalance = influxDBService.getCurrentBalanceFromNetMeasurement();
+				double netBalance = influxMeasurementService.getCurrentBalanceFromNetMeasurement();
 				netBalance += netProduction;
 				measurement.setCurrentBalance(netBalance);
 				measurement.setChange(netProduction);
 			}
 		}
 		updateDatabase(commercialStorageMeasurements, storageMeasurements, measurement);
+	}
+
+	private <T extends BaseStorage> double goThroughStoragesForConsumption(List<T> storages, double netConsumption, List<StorageMeasurement> storageMeasurements, List<StorageMeasurement> commercialStorageMeasurements, Instant time) {
+		for (BaseStorage storage : storages) {
+			double storageCurrentCharge = influxMeasurementService.getCurrentChargeFromStorage(storage.getDeviceId());
+			if (netConsumption > 0) {
+				double newCharge = Math.max(0, storageCurrentCharge - netConsumption);
+				double consumed = storageCurrentCharge - newCharge;
+				netConsumption -= consumed;
+
+				// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
+				if (storage instanceof Storage) {
+					storageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+				} else if (storage instanceof CommercialStorage) {
+					commercialStorageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+				}
+			}
+		}
+		return netConsumption;
+	}
+
+	private <T extends BaseStorage> double goThroughStoragesForProduction(List<T> storages, double netProduction, List<StorageMeasurement> storageMeasurements, List<StorageMeasurement> commercialStorageMeasurements, Instant time) {
+		for (BaseStorage storage : storages) {
+			double storageCurrentCharge = influxMeasurementService.getCurrentChargeFromStorage(storage.getDeviceId());
+			double capacity = storage.getCapacity();
+			if (netProduction > 0) {
+				double availableSpace = capacity - storageCurrentCharge;
+				double toStore = Math.min(netProduction, availableSpace);
+				double newCharge = storageCurrentCharge + toStore;
+
+				// Update der Produktion und Speicherladung
+				netProduction -= toStore;
+
+				// Erstelle ein Measurement für das neue `currentCharge` und füge es der Liste hinzu
+				if (storage instanceof Storage) {
+					storageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+				} else if (storage instanceof CommercialStorage) {
+					commercialStorageMeasurements.add(createStorageMeasurement(time, storage.getDeviceId(), storage.getOwnerId(), storage.getCapacity(), newCharge));
+				}
+			}
+		}
+		return netProduction;
 	}
 
 	private StorageMeasurement createStorageMeasurement(Instant time, Long deviceId, Long ownerId, double capacity, double currentCharge) {
@@ -236,15 +218,15 @@ public class StorageHandler {
 	private void updateDatabase(List<StorageMeasurement> commercialStorageMeasurements, List<StorageMeasurement> storageMeasurements, NetMeasurement netMeasurement) {
 
 		if (!commercialStorageMeasurements.isEmpty()) {
-			influxDBService.saveStorageMeasurements(commercialStorageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL);
+			influxMeasurementService.saveStorageMeasurements(commercialStorageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL);
 		}
 
 		if (!storageMeasurements.isEmpty()) {
-			influxDBService.saveStorageMeasurements(storageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE);
+			influxMeasurementService.saveStorageMeasurements(storageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE);
 		}
 
 		if (netMeasurement != null) {
-			influxDBService.saveNetMeasurement(netMeasurement, InfluxConstants.MEASUREMENT_NAME_NET);
+			influxMeasurementService.saveNetMeasurement(netMeasurement, InfluxConstants.MEASUREMENT_NAME_NET);
 		}
 	}
 }

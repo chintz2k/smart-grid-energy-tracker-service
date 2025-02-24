@@ -1,8 +1,8 @@
 package com.energytracker.quartz.jobs.producer;
 
 import com.energytracker.entity.CommercialProducer;
-import com.energytracker.influx.InfluxConstants;
-import com.energytracker.influx.InfluxDBService;
+import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.service.GeneralDeviceService;
@@ -21,8 +21,8 @@ public class CommercialProducerLoggerJob extends AbstractProducerLoggerJob<Comme
 	private final GeneralDeviceService<CommercialProducer> commercialProducerService;
 
 	@Autowired
-	public CommercialProducerLoggerJob(InfluxDBService influxDBService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, GeneralDeviceService<CommercialProducer> commercialProducerService) {
-		super(influxDBService, weatherApiClient, storageHandler);
+	public CommercialProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, GeneralDeviceService<CommercialProducer> commercialProducerService) {
+		super(influxMeasurementService, weatherApiClient, storageHandler);
 		this.commercialProducerService = commercialProducerService;
 	}
 

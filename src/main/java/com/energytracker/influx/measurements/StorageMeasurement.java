@@ -12,6 +12,7 @@ public class StorageMeasurement {
 	private String ownerId;
 	private double capacity;
 	private double currentCharge;
+	private String commercial;
 
 	public StorageMeasurement() {
 
@@ -55,5 +56,13 @@ public class StorageMeasurement {
 
 	public void setCurrentCharge(double currentCharge) {
 		this.currentCharge = currentCharge;
+	}
+
+	public String getCommercial() {
+		return commercial;
+	}
+
+	public void setCommercial(String commercial) {
+		this.commercial = commercial;
 	}
 }

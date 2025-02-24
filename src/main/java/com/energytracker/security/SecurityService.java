@@ -1,11 +1,15 @@
 package com.energytracker.security;
 
 import com.energytracker.exception.UnauthorizedAccessException;
+import com.energytracker.influx.service.general.InfluxMeasurementService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author André Heinen
@@ -14,10 +18,12 @@ import org.springframework.stereotype.Service;
 public class SecurityService {
 
 	private final JwtUtil jwtUtil;
+	private final InfluxMeasurementService influxMeasurementService;
 
 	@Autowired
-	public SecurityService(JwtUtil jwtUtil) {
+	public SecurityService(JwtUtil jwtUtil, InfluxMeasurementService influxMeasurementService) {
 		this.jwtUtil = jwtUtil;
+		this.influxMeasurementService = influxMeasurementService;
 	}
 
 	public Long extractUserIdFromPrincipal(Object principal) {
@@ -60,5 +66,58 @@ public class SecurityService {
 		}
 
 		throw new UnauthorizedAccessException("Invalid authentication context, cannot extract role");
+	}
+
+	public void checkIfDeviceBelongsToUserOrIsAdminOrIsSystem(Long deviceId) {
+		Long ownerId = getCurrentUserId();
+		if (deviceId != null) {
+			if (!getCurrentUserRole().equals("ROLE_ADMIN") && !getCurrentUserRole().equals("ROLE_SYSTEM")) {
+				if (!ownerId.equals(influxMeasurementService.getDeviceOwnerId(deviceId))) {
+					throw new UnauthorizedAccessException("Unauthorized access to consumer with ID " + deviceId + " for user with ID " + ownerId);
+				}
+			}
+		}
+	}
+
+	public List<Long> getDevicesThatBelongToUserFromStringOrIsAdminOrIsSystem(String deviceId) {
+		if (deviceId == null) {
+			return null;
+		}
+		Long ownerId = getCurrentUserId();
+		String[] splittedDeviceId = deviceId.split(",");
+		List<Long> rawList = new ArrayList<>();
+		for (String id : splittedDeviceId) {
+			String trimmedId = id.trim();
+			rawList.add(Long.parseLong(trimmedId));
+		}
+		List<Long> result = new ArrayList<>();
+		for (Long id : rawList) {
+			if (!getCurrentUserRole().equals("ROLE_ADMIN") && !getCurrentUserRole().equals("ROLE_SYSTEM")) {
+				if (ownerId.equals(influxMeasurementService.getDeviceOwnerId(id))) {
+					result.add(id);
+				}
+			} else {
+				result.add(id);
+			}
+		}
+		if (rawList.isEmpty()) {
+			throw new UnauthorizedAccessException("Unauthorized access to consumers with IDs " + rawList + " for user with ID " + ownerId);
+		}
+		return result;
+	}
+
+	public void checkIfUserIsOwnerOrIsAdminOrIsSystem(Long ownerId) {
+		if (getCurrentUserRole().equals("ROLE_ADMIN") || getCurrentUserRole().equals("ROLE_SYSTEM")) {
+			return;
+		}
+		if (!getCurrentUserId().equals(ownerId)) {
+			throw new UnauthorizedAccessException("Unauthorized access for user with ID " + getCurrentUserId());
+		}
+	}
+
+	public void checkIfUserIsAdminOrIsSystem() {
+		if (!getCurrentUserRole().equals("ROLE_ADMIN") && !getCurrentUserRole().equals("ROLE_SYSTEM")) {
+			throw new UnauthorizedAccessException("Unauthorized access for user with ID " + getCurrentUserId());
+		}
 	}
 }

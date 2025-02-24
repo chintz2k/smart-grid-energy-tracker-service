@@ -1,9 +1,10 @@
-package com.energytracker.influx;
+package com.energytracker.influx.service.general;
 
 import com.energytracker.influx.measurements.ConsumptionMeasurement;
 import com.energytracker.influx.measurements.NetMeasurement;
 import com.energytracker.influx.measurements.ProductionMeasurement;
 import com.energytracker.influx.measurements.StorageMeasurement;
+import com.energytracker.influx.util.InfluxConstants;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.WriteApiBlocking;
 import com.influxdb.client.domain.WritePrecision;
@@ -24,14 +25,14 @@ import java.util.List;
  * @author André Heinen
  */
 @Service
-public class InfluxDBService {
+public class InfluxMeasurementService {
 
-	private static final Logger logger = LoggerFactory.getLogger(InfluxDBService.class);
+	private static final Logger logger = LoggerFactory.getLogger(InfluxMeasurementService.class);
 
 	private final InfluxDBClient influxDBClient;
 
 	@Autowired
-	public InfluxDBService(InfluxDBClient influxDBClient) {
+	public InfluxMeasurementService(InfluxDBClient influxDBClient) {
 		this.influxDBClient = influxDBClient;
 	}
 
@@ -57,6 +58,14 @@ public class InfluxDBService {
 		}
 		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
 		measurements.forEach(measurement -> writeApi.writePoint(InfluxConstants.BUCKET_STORAGE, InfluxConstants.ORG_NAME, createStorageMeasurementPoint(measurement, measurementName)));
+	}
+
+	public void saveStorageMeasurement(StorageMeasurement measurement, @NotNull @NotBlank String measurementName) {
+		if (measurement == null) {
+			return;
+		}
+		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
+		writeApi.writePoint(InfluxConstants.BUCKET_STORAGE, InfluxConstants.ORG_NAME, createStorageMeasurementPoint(measurement, measurementName));
 	}
 
 	public void saveNetMeasurement(NetMeasurement measurement, @NotNull @NotBlank String measurementName) {
@@ -241,6 +250,7 @@ public class InfluxDBService {
 				}
 			}
 		}
-		throw new IllegalStateException("Kein OwnerId für deviceId " + deviceId + " in den Buckets gefunden.");
+		logger.error("Keine OwnerId für deviceId {} in den Buckets gefunden.", deviceId);
+		return null;
 	}
 }

@@ -1,4 +1,4 @@
-package com.energytracker.influx;
+package com.energytracker.influx.util;
 
 import org.springframework.stereotype.Service;
 
@@ -14,8 +14,8 @@ public class ChartColorPicker {
 
 	public String generateColor(int index, int total, double alpha) {
 		double hue = (index * 360.0 / total) % 360; // Gleichmäßige Verteilung auf 360 Grad
-		double saturation = 70.0; // Sättigung: 70%
-		double lightness = 50.0; // Helligkeit: 50%
+		double saturation = 70.0; // Sättigung: 70 %
+		double lightness = 50.0; // Helligkeit: 50 %
 
 		// HSL -> RGB Konvertierung
 		double c = (1 - Math.abs(2 * lightness / 100.0 - 1)) * saturation / 100.0;

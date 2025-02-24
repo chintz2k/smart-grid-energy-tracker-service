@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 /**
  * @author André Heinen
@@ -17,6 +18,9 @@ public interface GeneralDeviceService<T extends BaseDevice> {
 
 	@Transactional(readOnly = true)
 	List<T> getAll();
+
+	@Transactional(readOnly = true)
+	Set<Long> getAllDeviceIds();
 
 	@Transactional(readOnly = true)
 	T getDeviceById(Long id);

@@ -4,9 +4,9 @@ import com.energytracker.dto.WeatherResponse;
 import com.energytracker.entity.BaseProducer;
 import com.energytracker.entity.CommercialProducer;
 import com.energytracker.entity.Producer;
-import com.energytracker.influx.InfluxConstants;
-import com.energytracker.influx.InfluxDBService;
 import com.energytracker.influx.measurements.ProductionMeasurement;
+import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.webclients.WeatherApiClient;
 import org.jetbrains.annotations.Nullable;
@@ -35,7 +35,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 
 	private static final int BATCH_SIZE = 500;
 
-	private final InfluxDBService influxDBService;
+	private final InfluxMeasurementService influxMeasurementService;
 	private final WeatherApiClient weatherApiClient;
 	private final StorageHandler storageHandler;
 
@@ -50,8 +50,8 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	private double windPowerModificator = 1.0;
 
 	@Autowired
-	public AbstractProducerLoggerJob(InfluxDBService influxDBService, WeatherApiClient weatherApiClient, StorageHandler storageHandler) {
-		this.influxDBService = influxDBService;
+	public AbstractProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler) {
+		this.influxMeasurementService = influxMeasurementService;
 		this.weatherApiClient = weatherApiClient;
 		this.storageHandler = storageHandler;
 	}
@@ -139,23 +139,23 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		}
 
 		if (!measurementsBatch.isEmpty()) {
-			influxDBService.saveProductionMeasurements(measurementsBatch, getMeasurementName());
+			influxMeasurementService.saveProductionMeasurements(measurementsBatch, getMeasurementName());
 		}
 
 		if (!totalProductionByOwnerAndPowerTypeAndTimestamp.isEmpty()) {
-			influxDBService.saveProductionMeasurements(totalProductionByOwnerAndPowerTypeAndTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
+			influxMeasurementService.saveProductionMeasurements(totalProductionByOwnerAndPowerTypeAndTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
 		}
 
 		if (!totalProductionOfOwnerByTimestamp.isEmpty()) {
-			influxDBService.saveProductionMeasurements(totalProductionOfOwnerByTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
+			influxMeasurementService.saveProductionMeasurements(totalProductionOfOwnerByTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
 		}
 
 		if (!totalProductionByPowerTypeAndTimestamp.isEmpty()) {
-			influxDBService.saveProductionMeasurements(totalProductionByPowerTypeAndTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
+			influxMeasurementService.saveProductionMeasurements(totalProductionByPowerTypeAndTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
 		}
 
 		if (!totalProductionByTimestamp.isEmpty()) {
-			influxDBService.saveProductionMeasurements(totalProductionByTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
+			influxMeasurementService.saveProductionMeasurements(totalProductionByTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
 		}
 
 		if (!removedProducers.isEmpty()) {
@@ -422,8 +422,8 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 				totalMeasurement.setDeviceId(null); // Kein spezifisches Device, da die Summe aller Devices umfasst ist
 				totalMeasurement.setOwnerId(ownerId);
 				totalMeasurement.setProduction(totalProduction);
-				totalMeasurement.setPowerType("all");
-				totalMeasurement.setRenewable("beides");
+				totalMeasurement.setPowerType("Alle Energiearten");
+				totalMeasurement.setRenewable("Beides");
 
 				totalMeasurements.add(totalMeasurement);
 			});
@@ -530,8 +530,8 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			totalMeasurement.setDeviceId(null); // Kein spezifisches Device, da die Summe aller Devices umfasst ist
 			totalMeasurement.setOwnerId(null); // Kein spezifischer Owner, da die Summe aller Owner umfasst ist
 			totalMeasurement.setProduction(totalProduction);
-			totalMeasurement.setPowerType("all");
-			totalMeasurement.setRenewable("mixed");
+			totalMeasurement.setPowerType("Alle Energiearten");
+			totalMeasurement.setRenewable("Mixed");
 
 			totalMeasurments.add(totalMeasurement);
 		});
