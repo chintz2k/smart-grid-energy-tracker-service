@@ -1,9 +1,6 @@
 package com.energytracker.influx.service.general;
 
-import com.energytracker.influx.measurements.ConsumptionMeasurement;
-import com.energytracker.influx.measurements.NetMeasurement;
-import com.energytracker.influx.measurements.ProductionMeasurement;
-import com.energytracker.influx.measurements.StorageMeasurement;
+import com.energytracker.influx.measurements.*;
 import com.energytracker.influx.util.InfluxConstants;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.client.WriteApiBlocking;
@@ -76,6 +73,14 @@ public class InfluxMeasurementService {
 		writeApi.writePoint(InfluxConstants.BUCKET_NET, InfluxConstants.ORG_NAME, createNetMeasurementPoint(measurement, measurementName));
 	}
 
+	public void savePowerPlantLimit(PowerPlantLimitMeasurement measurement, @NotNull @NotBlank String measurementName) {
+		if (measurement == null) {
+			return;
+		}
+		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
+		writeApi.writePoint(InfluxConstants.BUCKET_NET, InfluxConstants.ORG_NAME, createPowerPlantLimitPoint(measurement, measurementName));
+	}
+
 	private Point createConsumptionMeasurementPoint(ConsumptionMeasurement measurement, String measurementName) {
 		String deviceId = null;
 		if (measurement.getDeviceId() != null) {
@@ -135,89 +140,10 @@ public class InfluxMeasurementService {
 				.addField("change", measurement.getChange());
 	}
 
-	private Double findFirstDoubleInFluxTables(List<FluxTable> results) {
-		if (results == null || results.isEmpty()) {
-			return null;
-		}
-
-		// Prüfen, ob die Query Ergebnisse Punkte enthalten
-		for (FluxTable table : results) {
-			for (FluxRecord record : table.getRecords()) {
-				if (record.getValue() instanceof Double) {
-					return (Double) record.getValue();
-				}
-			}
-		}
-
-		return null;
-	}
-
-	public synchronized double getCurrentChargeFromStorage(Long deviceId) {
-		// Query für das Measurement "commercial_storages"
-		String fluxQueryCommercial = String.format(
-				"from(bucket: \"%s\") "
-						+ "|> range(start: -30d) "  // Bis zu 30 Tage zurück
-						+ "|> filter(fn: (r) => r._measurement == \"%s\") " // Measurement filtern
-						+ "|> filter(fn: (r) => r.deviceId == \"%s\") " // deviceId filtern
-						+ "|> filter(fn: (r) => r._field == \"currentCharge\") " // Feld `currentCharge`
-						+ "|> last()",  // Nur den letzten Wert auswählen
-				InfluxConstants.BUCKET_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL, deviceId
-		);
-
-		// Query für das Measurement "storages"
-		String fluxQueryStorages = String.format(
-				"from(bucket: \"%s\") "
-						+ "|> range(start: -30d) "
-						+ "|> filter(fn: (r) => r._measurement == \"%s\") "
-						+ "|> filter(fn: (r) => r.deviceId == \"%s\") "
-						+ "|> filter(fn: (r) => r._field == \"currentCharge\") "
-						+ "|> last()",
-				InfluxConstants.BUCKET_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE, deviceId
-		);
-
-		try {
-			List<FluxTable> commercialResults = influxDBClient.getQueryApi().query(fluxQueryCommercial);
-			Double commercialValue = findFirstDoubleInFluxTables(commercialResults);
-			if (commercialValue != null) {
-				return commercialValue; // Erfolgreich gefunden
-			}
-
-			// Fallback: Abfrage in "storages"
-			List<FluxTable> storageResults = influxDBClient.getQueryApi().query(fluxQueryStorages);
-			Double storageValue = findFirstDoubleInFluxTables(storageResults);
-			if (storageValue != null) {
-				return storageValue; // Erfolgreich gefunden
-			}
-
-			return 0.0; // Wenn kein Wert gefunden wurde, ist die Ladung 0.0
-		} catch (Exception e) {
-			logger.error("Fehler bei der Influx Query des Storage {}, 0.0 zurückgegeben", deviceId, e);
-			return 0.0; // Bei Fehlern einfach 0.0 zurückgeben und den Fehler loggen
-		}
-	}
-
-	public synchronized double getCurrentBalanceFromNetMeasurement() {
-		String fluxQuery = String.format(
-				"from(bucket: \"%s\") "
-						+ "|> range(start: -30d) "
-						+ "|> filter(fn: (r) => r._measurement == \"%s\") "
-						+ "|> filter(fn: (r) => r._field == \"currentBalance\") "
-						+ "|> last()",
-				InfluxConstants.BUCKET_NET, InfluxConstants.MEASUREMENT_NAME_NET
-		);
-
-		try {
-			List<FluxTable> results = influxDBClient.getQueryApi().query(fluxQuery);
-			Double currentBalance = findFirstDoubleInFluxTables(results);
-			if (currentBalance != null) {
-				return currentBalance;
-			}
-
-			return 0.0; // Wenn kein Wert gefunden wurde, ist die Ladung 0.0
-		} catch (Exception e) {
-			logger.error("Fehler bei der Influx Query der NetBalance, 0.0 zurückgegeben", e);
-			return 0.0;
-		}
+	private Point createPowerPlantLimitPoint(PowerPlantLimitMeasurement measurement, String measurementName) {
+		return Point.measurement(measurementName)
+				.time(measurement.getTimestamp().toEpochMilli(), WritePrecision.MS)
+				.addField("limit", measurement.getLimit());
 	}
 
 	public Long getDeviceOwnerId(Long deviceId) {
@@ -238,11 +164,11 @@ public class InfluxMeasurementService {
 			);
 
 			List<FluxTable> tables = influxDBClient.getQueryApi().query(fluxQuery);
-			if (tables != null && !tables.isEmpty()) {
+			if (!tables.isEmpty()) {
 				for (FluxTable table : tables) {
 					List<FluxRecord> records = table.getRecords();
-					if (records != null && !records.isEmpty()) {
-						Object ownerIdObj = records.get(0).getValueByKey("ownerId");
+					if (!records.isEmpty()) {
+						Object ownerIdObj = records.getFirst().getValueByKey("ownerId");
 						if (ownerIdObj != null) {
 							return Long.valueOf(ownerIdObj.toString());
 						}

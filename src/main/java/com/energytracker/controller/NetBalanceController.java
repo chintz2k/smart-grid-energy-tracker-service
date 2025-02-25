@@ -24,6 +24,13 @@ public class NetBalanceController {
 		this.netBalanceService = netBalanceService;
 	}
 
+	@RequestMapping("/latest")
+	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
+	public ResponseEntity<Map<String, Double>> getCurrentBalance() {
+		Map<String, Double> result = netBalanceService.getCurrentBalance();
+		return ResponseEntity.ok().body(result);
+	}
+
 	@RequestMapping("/chart")
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
 	public ResponseEntity<Map<String, Object>> getNetBalanceMeasurementsForChartJs(

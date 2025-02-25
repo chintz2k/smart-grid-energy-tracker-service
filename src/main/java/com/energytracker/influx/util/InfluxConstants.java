@@ -36,6 +36,7 @@ public class InfluxConstants {
 	public static final String MEASUREMENT_NAME_STORAGE_TOTAL_TOTAL = "storages_total_total";
 
 	public static final String MEASUREMENT_NAME_NET = "net_balance";
+	public static final String MEASUREMENT_NAME_POWER_PLANT_LIMIT = "power_plant_limit";
 
 	public static final List<String> POWER_TYPES = List.of("Solar Power", "Wind Power", "Hydro Power", "Geothermal Power", "Biomass Power", "Coal Power", "Natural Gas Power", "Oil Power", "Nuclear Power");
 }

@@ -63,6 +63,10 @@ public class QuartzJobMonitoringAspect {
 			// Führe die `execute`-Logik aus
 			return pjp.proceed();
 
+		} catch (InterruptedException e) {
+			// Thread-Interrupt abfangen
+			Thread.currentThread().interrupt();
+			throw e; // Oder passende Fehlerbehandlung
 		} finally {
 			// Messe die Laufzeit
 			long executionTime = System.currentTimeMillis() - startTime;

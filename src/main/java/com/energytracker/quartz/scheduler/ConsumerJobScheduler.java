@@ -1,4 +1,4 @@
-package com.energytracker.quartz;
+package com.energytracker.quartz.scheduler;
 
 import com.energytracker.quartz.jobs.consumer.CommercialConsumerLoggerJob;
 import com.energytracker.quartz.jobs.consumer.ConsumerLoggerJob;

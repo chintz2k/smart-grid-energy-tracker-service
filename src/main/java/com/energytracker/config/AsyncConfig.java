@@ -22,6 +22,8 @@ public class AsyncConfig {
 		executor.setQueueCapacity(1000);
 		executor.setThreadNamePrefix("AsyncExecutor-");
 		executor.setKeepAliveSeconds(600);
+		executor.setAwaitTerminationSeconds(120);
+		executor.setWaitForTasksToCompleteOnShutdown(true);
 		executor.initialize();
 		return executor;
 	}

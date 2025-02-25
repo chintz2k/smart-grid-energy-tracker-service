@@ -1,4 +1,4 @@
-package com.energytracker.quartz;
+package com.energytracker.quartz.scheduler;
 
 import com.energytracker.quartz.jobs.storage.StorageLoggerJob;
 import com.energytracker.quartz.util.QuartzIntervals;

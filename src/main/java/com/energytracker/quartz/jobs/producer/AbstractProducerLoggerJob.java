@@ -8,6 +8,7 @@ import com.energytracker.influx.measurements.ProductionMeasurement;
 import com.energytracker.influx.service.general.InfluxMeasurementService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.StorageHandler;
+import com.energytracker.service.NetBalanceService;
 import com.energytracker.webclients.WeatherApiClient;
 import org.jetbrains.annotations.Nullable;
 import org.quartz.Job;
@@ -38,8 +39,10 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	private final InfluxMeasurementService influxMeasurementService;
 	private final WeatherApiClient weatherApiClient;
 	private final StorageHandler storageHandler;
+	private final NetBalanceService netBalanceService;
 
 	protected abstract List<T> getActiveProducers();
+	protected abstract boolean commercial();
 	protected abstract T getProducerById(Long id);
 	protected abstract String getMeasurementName();
 	protected abstract void updateAll(List<T> producerList);
@@ -50,10 +53,11 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	private double windPowerModificator = 1.0;
 
 	@Autowired
-	public AbstractProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler) {
+	public AbstractProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, NetBalanceService netBalanceService) {
 		this.influxMeasurementService = influxMeasurementService;
 		this.weatherApiClient = weatherApiClient;
 		this.storageHandler = storageHandler;
+		this.netBalanceService = netBalanceService;
 	}
 
 	@Override
@@ -234,10 +238,9 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			ProductionMeasurement zeroMeasurement = createZeroMeasurementAtStart(producer);
 			measurementsBatch.add(zeroMeasurement);
 
-			Instant alignedStart = startTime.minusSeconds(startTime.getEpochSecond() % getIntervalInSeconds())
+			return startTime.minusSeconds(startTime.getEpochSecond() % getIntervalInSeconds())
 					.truncatedTo(ChronoUnit.SECONDS)
 					.plusSeconds(getIntervalInSeconds());
-			return alignedStart;
 		}
 		return startTime;
 	}
@@ -311,12 +314,13 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	}
 
 	private double getProduction(T producer, long durationInMilliseconds) {
+		double commercialPowerPlantLimit = commercial() ? netBalanceService.getCachedCommercialPowerPlantLimit() : 1.0;
 		if (producer.getPowerType().equals("Solar Power")) {
-			return ((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * sunPowerModificator);
+			return (((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * sunPowerModificator) * commercialPowerPlantLimit);
 		} else if (producer.getPowerType().equals("Wind Power")) {
-			return ((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * windPowerModificator);
+			return (((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * windPowerModificator) * commercialPowerPlantLimit);
 		} else {
-			return ((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)));
+			return (((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0))) * commercialPowerPlantLimit);
 		}
 	}
 

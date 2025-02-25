@@ -6,6 +6,7 @@ import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.service.GeneralDeviceService;
+import com.energytracker.service.NetBalanceService;
 import com.energytracker.webclients.WeatherApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -21,14 +22,19 @@ public class ProducerLoggerJob extends AbstractProducerLoggerJob<Producer> {
 	private final GeneralDeviceService<Producer> producerService;
 
 	@Autowired
-	public ProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, GeneralDeviceService<Producer> producerService) {
-		super(influxMeasurementService, weatherApiClient, storageHandler);
+	public ProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, NetBalanceService netBalanceService, GeneralDeviceService<Producer> producerService) {
+		super(influxMeasurementService, weatherApiClient, storageHandler, netBalanceService);
 		this.producerService = producerService;
 	}
 
 	@Override
 	protected List<Producer> getActiveProducers() {
 		return producerService.getAll();
+	}
+
+	@Override
+	protected boolean commercial() {
+		return false;
 	}
 
 	@Override

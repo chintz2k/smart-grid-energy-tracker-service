@@ -8,16 +8,16 @@ import com.energytracker.influx.measurements.StorageMeasurement;
 import com.energytracker.influx.service.general.InfluxMeasurementService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.service.GeneralDeviceService;
+import com.influxdb.client.InfluxDBClient;
+import com.influxdb.query.FluxRecord;
+import com.influxdb.query.FluxTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
@@ -34,12 +34,14 @@ public class StorageHandler {
 	private final InfluxMeasurementService influxMeasurementService;
 	private final GeneralDeviceService<CommercialStorage> commercialStorageService;
 	private final GeneralDeviceService<Storage> storageService;
+	private final InfluxDBClient influxDBClient;
 
 	@Autowired
-	public StorageHandler(InfluxMeasurementService influxMeasurementService, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService) {
+	public StorageHandler(InfluxMeasurementService influxMeasurementService, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService, InfluxDBClient influxDBClient) {
 		this.influxMeasurementService = influxMeasurementService;
 		this.commercialStorageService = commercialStorageService;
 		this.storageService = storageService;
+		this.influxDBClient = influxDBClient;
 	}
 
 	public void updateStorages(Map<Long, Double> totalConsumptionOrProductionOfOwnerMap, boolean isConsumption) {
@@ -73,8 +75,7 @@ public class StorageHandler {
 		// 1. Gehe den Verbrauch pro Nutzer durch
 		for (Map.Entry<Long, Double> entry : totalConsumptionOfOwnerMap.entrySet()) {
 			Long ownerId = entry.getKey();
-			double consumption = entry.getValue();
-			double netConsumption = consumption;
+			double netConsumption = entry.getValue();
 
 //			System.out.println("Consumption: " + consumption + " for owner: " + ownerId);
 
@@ -103,7 +104,7 @@ public class StorageHandler {
 			if (netConsumption > 0) {
 				measurement = new NetMeasurement();
 				measurement.setTimestamp(time);
-				double netBalance = influxMeasurementService.getCurrentBalanceFromNetMeasurement();
+				double netBalance = getCurrentBalanceFromNetMeasurement();
 				netBalance -= netConsumption;
 				double netProductionChange = netConsumption * (-1.0);
 				measurement.setCurrentBalance(netBalance);
@@ -124,8 +125,7 @@ public class StorageHandler {
 		// 1. Gehe die Produktion pro Nutzer durch
 		for (Map.Entry<Long, Double> entry : totalProductionOfOwnerMap.entrySet()) {
 			Long ownerId = entry.getKey();
-			double production = entry.getValue();
-			double netProduction = production;
+			double netProduction = entry.getValue();
 
 //			System.out.println("Production: " + production + " for owner: " + ownerId);
 
@@ -154,7 +154,7 @@ public class StorageHandler {
 			if (netProduction > 0) {
 				measurement = new NetMeasurement();
 				measurement.setTimestamp(time);
-				double netBalance = influxMeasurementService.getCurrentBalanceFromNetMeasurement();
+				double netBalance = getCurrentBalanceFromNetMeasurement();
 				netBalance += netProduction;
 				measurement.setCurrentBalance(netBalance);
 				measurement.setChange(netProduction);
@@ -163,9 +163,88 @@ public class StorageHandler {
 		updateDatabase(commercialStorageMeasurements, storageMeasurements, measurement);
 	}
 
+	public synchronized double getCurrentBalanceFromNetMeasurement() {
+		String fluxQuery = String.format(
+				"from(bucket: \"%s\") "
+						+ "|> range(start: -30d) "
+						+ "|> filter(fn: (r) => r._measurement == \"%s\") "
+						+ "|> filter(fn: (r) => r._field == \"currentBalance\") "
+						+ "|> last()",
+				InfluxConstants.BUCKET_NET, InfluxConstants.MEASUREMENT_NAME_NET
+		);
+
+		try {
+			List<FluxTable> results = influxDBClient.getQueryApi().query(fluxQuery);
+			Double currentBalance = findFirstDoubleInFluxTables(results);
+			return Objects.requireNonNullElse(currentBalance, 0.0);
+
+		} catch (Exception e) {
+			logger.error("Fehler bei der Influx Query der NetBalance, 0.0 zurückgegeben", e);
+			return 0.0;
+		}
+	}
+
+	private Double findFirstDoubleInFluxTables(List<FluxTable> results) {
+		if (results == null || results.isEmpty()) {
+			return null;
+		}
+
+		// Prüfen, ob die Query Ergebnisse Punkte enthalten
+		for (FluxTable table : results) {
+			for (FluxRecord record : table.getRecords()) {
+				if (record.getValue() instanceof Double) {
+					return (Double) record.getValue();
+				}
+			}
+		}
+
+		return null;
+	}
+
+	private synchronized double getCurrentChargeFromStorage(Long deviceId) {
+		// Query für das Measurement "commercial_storages"
+		String fluxQueryCommercial = String.format(
+				"from(bucket: \"%s\") "
+						+ "|> range(start: -30d) "  // Bis zu 30 Tage zurück
+						+ "|> filter(fn: (r) => r._measurement == \"%s\") " // Measurement filtern
+						+ "|> filter(fn: (r) => r.deviceId == \"%s\") " // deviceId filtern
+						+ "|> filter(fn: (r) => r._field == \"currentCharge\") " // Feld `currentCharge`
+						+ "|> last()",  // Nur den letzten Wert auswählen
+				InfluxConstants.BUCKET_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL, deviceId
+		);
+
+		// Query für das Measurement "storages"
+		String fluxQueryStorages = String.format(
+				"from(bucket: \"%s\") "
+						+ "|> range(start: -30d) "
+						+ "|> filter(fn: (r) => r._measurement == \"%s\") "
+						+ "|> filter(fn: (r) => r.deviceId == \"%s\") "
+						+ "|> filter(fn: (r) => r._field == \"currentCharge\") "
+						+ "|> last()",
+				InfluxConstants.BUCKET_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE, deviceId
+		);
+
+		try {
+			List<FluxTable> commercialResults = influxDBClient.getQueryApi().query(fluxQueryCommercial);
+			Double commercialValue = findFirstDoubleInFluxTables(commercialResults);
+			if (commercialValue != null) {
+				return commercialValue; // Erfolgreich gefunden
+			}
+
+			// Fallback: Abfrage in "storages"
+			List<FluxTable> storageResults = influxDBClient.getQueryApi().query(fluxQueryStorages);
+			Double storageValue = findFirstDoubleInFluxTables(storageResults);
+			return Objects.requireNonNullElse(storageValue, 0.0); // Erfolgreich gefunden
+
+		} catch (Exception e) {
+			logger.error("Fehler bei der Influx Query des Storage {}, 0.0 zurückgegeben", deviceId, e);
+			return 0.0; // Bei Fehlern einfach 0.0 zurückgeben und den Fehler loggen
+		}
+	}
+
 	private <T extends BaseStorage> double goThroughStoragesForConsumption(List<T> storages, double netConsumption, List<StorageMeasurement> storageMeasurements, List<StorageMeasurement> commercialStorageMeasurements, Instant time) {
 		for (BaseStorage storage : storages) {
-			double storageCurrentCharge = influxMeasurementService.getCurrentChargeFromStorage(storage.getDeviceId());
+			double storageCurrentCharge = getCurrentChargeFromStorage(storage.getDeviceId());
 			if (netConsumption > 0) {
 				double newCharge = Math.max(0, storageCurrentCharge - netConsumption);
 				double consumed = storageCurrentCharge - newCharge;
@@ -184,7 +263,7 @@ public class StorageHandler {
 
 	private <T extends BaseStorage> double goThroughStoragesForProduction(List<T> storages, double netProduction, List<StorageMeasurement> storageMeasurements, List<StorageMeasurement> commercialStorageMeasurements, Instant time) {
 		for (BaseStorage storage : storages) {
-			double storageCurrentCharge = influxMeasurementService.getCurrentChargeFromStorage(storage.getDeviceId());
+			double storageCurrentCharge = getCurrentChargeFromStorage(storage.getDeviceId());
 			double capacity = storage.getCapacity();
 			if (netProduction > 0) {
 				double availableSpace = capacity - storageCurrentCharge;

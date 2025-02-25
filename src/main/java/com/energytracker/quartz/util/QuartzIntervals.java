@@ -24,4 +24,6 @@ public class QuartzIntervals {
 
 	public static final String STORAGE_CRON_JOB = "3 * * * * ?";
 
+	public static final String NEW_POWER_PLANT_LIMIT_CRON_JOB = "0 * * * * ?";
+
 }
