@@ -143,7 +143,8 @@ public class InfluxMeasurementService {
 	private Point createPowerPlantLimitPoint(PowerPlantLimitMeasurement measurement, String measurementName) {
 		return Point.measurement(measurementName)
 				.time(measurement.getTimestamp().toEpochMilli(), WritePrecision.MS)
-				.addField("limit", measurement.getLimit());
+				.addField("fossilLimit", measurement.getFossilLimit())
+				.addField("renewableLimit", measurement.getRenewableLimit());
 	}
 
 	public Long getDeviceOwnerId(Long deviceId) {

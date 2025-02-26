@@ -2,10 +2,7 @@ package com.energytracker.aspect;
 
 import com.energytracker.service.QuartzJobMonitoringService;
 import org.aspectj.lang.ProceedingJoinPoint;
-import org.aspectj.lang.annotation.Around;
-import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Before;
-import org.aspectj.lang.annotation.Pointcut;
+import org.aspectj.lang.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -60,22 +57,22 @@ public class QuartzJobMonitoringAspect {
 			service.updateCurrentStats(activeJobCount.get(), queuedJobCount.get());
 			service.updateMaxStats(maxActiveJobCount.get(), maxQueuedJobCount.get(), 0L, null);
 
-			// Führe die `execute`-Logik aus
-			return pjp.proceed();
+			Object object = pjp.proceed();
 
-		} catch (InterruptedException e) {
-			// Thread-Interrupt abfangen
-			Thread.currentThread().interrupt();
-			throw e; // Oder passende Fehlerbehandlung
-		} finally {
-			// Messe die Laufzeit
 			long executionTime = System.currentTimeMillis() - startTime;
-
-			// Nach Abschluss des Jobs Anzahl aktiver Jobs verringern
-			activeJobCount.decrementAndGet();
-
-			service.updateCurrentStats(activeJobCount.get(), queuedJobCount.get());
 			service.updateMaxStats(maxActiveJobCount.get(), maxQueuedJobCount.get(), executionTime, className);
+
+			// Führe die `execute`-Logik aus
+			return object;
+
+		} catch (Exception e) {
+			throw new RuntimeException("Fehler im Around Aspect" + e.getMessage());
 		}
+	}
+
+	@After("quartzJobExecution()")
+	public void afterJobExecution() {
+		activeJobCount.decrementAndGet();
+		service.updateCurrentStats(activeJobCount.get(), queuedJobCount.get());
 	}
 }

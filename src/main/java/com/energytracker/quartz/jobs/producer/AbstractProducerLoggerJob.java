@@ -51,6 +51,9 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 
 	private double sunPowerModificator = 1.0;
 	private double windPowerModificator = 1.0;
+	private double hydroPowerModificator = 1.0;
+	private double geothermalPowerModificator = 1.0;
+	private double biomassPowerModificator = 1.0;
 
 	@Autowired
 	public AbstractProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, NetBalanceService netBalanceService) {
@@ -314,14 +317,22 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	}
 
 	private double getProduction(T producer, long durationInMilliseconds) {
-		double commercialPowerPlantLimit = commercial() ? netBalanceService.getCachedCommercialPowerPlantLimit() : 1.0;
-		if (producer.getPowerType().equals("Solar Power")) {
-			return (((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * sunPowerModificator) * commercialPowerPlantLimit);
-		} else if (producer.getPowerType().equals("Wind Power")) {
-			return (((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * windPowerModificator) * commercialPowerPlantLimit);
-		} else {
-			return (((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0))) * commercialPowerPlantLimit);
-		}
+		double commercialPowerPlantLimitForFossil = commercial() ? netBalanceService.getCommercialPowerPlantLimitForFossil() : 1.0;
+		double commercialPowerPlantLimitForRenewable = commercial() ? netBalanceService.getCommercialPowerPlantLimitForRenewable() : 1.0;
+		return switch (producer.getPowerType()) {
+			case "Solar Power" ->
+					(((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * sunPowerModificator) * commercialPowerPlantLimitForRenewable);
+			case "Wind Power" ->
+					(((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * windPowerModificator) * commercialPowerPlantLimitForRenewable);
+			case "Hydro Power" ->
+					(((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * hydroPowerModificator) * commercialPowerPlantLimitForRenewable);
+			case "Geothermal Power" ->
+					(((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * geothermalPowerModificator) * commercialPowerPlantLimitForRenewable);
+			case "Biomass Power" ->
+					(((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * biomassPowerModificator) * commercialPowerPlantLimitForRenewable);
+			default ->
+					(((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0))) * commercialPowerPlantLimitForFossil);
+		};
 	}
 
 	private long getElapsedTimeInMilliseconds(Instant start, Instant end) {

@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Map;
 
 /**
  * @author André Heinen
@@ -29,12 +30,13 @@ public class PowerPlantLimitJob implements Job {
 
 	@Override
 	public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
-		double powerPlantLimit = netBalanceService.setNewCommercialPowerPlantLimit();
+		Map<String, Double> powerPlantLimit = netBalanceService.setNewCommercialPowerPlantLimit();
 
 		Instant timestamp = Instant.now();
 		PowerPlantLimitMeasurement measurement = new PowerPlantLimitMeasurement();
 		measurement.setTimestamp(timestamp);
-		measurement.setLimit(powerPlantLimit);
+		measurement.setFossilLimit(powerPlantLimit.get(NetBalanceService.CACHE_KEY_FOR_FOSSIL));
+		measurement.setRenewableLimit(powerPlantLimit.get(NetBalanceService.CACHE_KEY_FOR_RENEWABLE));
 		influxMeasurementService.savePowerPlantLimit(measurement, InfluxConstants.MEASUREMENT_NAME_POWER_PLANT_LIMIT);
 	}
 }

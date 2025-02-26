@@ -1,11 +1,17 @@
 package com.energytracker.service;
 
+import java.util.Map;
+
 /**
  * @author André Heinen
  */
 public interface NetBalanceService {
 
-	double setNewCommercialPowerPlantLimit();
-	double getCachedCommercialPowerPlantLimit();
+	String CACHE_KEY_FOR_FOSSIL = "currentLimitForFossil";
+	String CACHE_KEY_FOR_RENEWABLE = "currentLimitForRenewable";
+
+	Map<String, Double> setNewCommercialPowerPlantLimit();
+	double getCommercialPowerPlantLimitForFossil();
+	double getCommercialPowerPlantLimitForRenewable();
 
 }

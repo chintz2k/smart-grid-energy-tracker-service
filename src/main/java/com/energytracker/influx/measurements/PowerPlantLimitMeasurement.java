@@ -8,7 +8,8 @@ import java.time.Instant;
 public class PowerPlantLimitMeasurement {
 
 	private Instant timestamp;
-	private double limit;
+	private double fossilLimit;
+	private double renewableLimit;
 
 	public PowerPlantLimitMeasurement() {
 
@@ -22,11 +23,19 @@ public class PowerPlantLimitMeasurement {
 		this.timestamp = timestamp;
 	}
 
-	public double getLimit() {
-		return limit;
+	public double getFossilLimit() {
+		return fossilLimit;
 	}
 
-	public void setLimit(double limit) {
-		this.limit = limit;
+	public void setFossilLimit(double fossilLimit) {
+		this.fossilLimit = fossilLimit;
+	}
+
+	public double getRenewableLimit() {
+		return renewableLimit;
+	}
+
+	public void setRenewableLimit(double renewableLimit) {
+		this.renewableLimit = renewableLimit;
 	}
 }
