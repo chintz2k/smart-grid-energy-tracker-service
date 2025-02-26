@@ -75,11 +75,13 @@ public class TokenService {
 
 	private boolean isTokenExpired(String token) {
 		try {
-			return jwtUtil.getClaimsFromToken(token)
-					.getExpiration()
-					.before(new Date());
+			Date expirationDate = jwtUtil.getClaimsFromToken(token).getExpiration();
+
+			Date bufferDate = new Date(expirationDate.getTime() - 2 * 60 * 1000); // 2 Minuten früher
+
+			return bufferDate.before(new Date());
 		} catch (Exception e) {
-			return true;
+			return true; // Wenn ein Fehler auftritt, betrachte das Token als abgelaufen
 		}
 	}
 

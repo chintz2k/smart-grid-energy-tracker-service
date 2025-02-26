@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -37,24 +38,36 @@ public class InfluxMeasurementService {
 		if (measurements.isEmpty()) {
 			return;
 		}
-		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
-		measurements.forEach(measurement -> writeApi.writePoint(InfluxConstants.BUCKET_CONSUMPTION, InfluxConstants.ORG_NAME, createConsumptionMeasurementPoint(measurement, measurementName)));
+		List<Point> points = new ArrayList<>();
+		for (ConsumptionMeasurement measurement : measurements) {
+			points.add(createConsumptionMeasurementPoint(measurement, measurementName));
+		}
+		WriteApiBlocking writeApiBlocking = influxDBClient.getWriteApiBlocking();
+		writeApiBlocking.writePoints(InfluxConstants.BUCKET_CONSUMPTION, InfluxConstants.ORG_NAME, points);
 	}
 
 	public void saveProductionMeasurements(List<ProductionMeasurement> measurements, @NotNull @NotBlank String measurementName) {
 		if (measurements.isEmpty()) {
 			return;
 		}
-		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
-		measurements.forEach(measurement -> writeApi.writePoint(InfluxConstants.BUCKET_PRODUCTION, InfluxConstants.ORG_NAME, createProductionMeasurementPoint(measurement, measurementName)));
+		List<Point> points = new ArrayList<>();
+		for (ProductionMeasurement measurement : measurements) {
+			points.add(createProductionMeasurementPoint(measurement, measurementName));
+		}
+		WriteApiBlocking writeApiBlocking = influxDBClient.getWriteApiBlocking();
+		writeApiBlocking.writePoints(InfluxConstants.BUCKET_PRODUCTION, InfluxConstants.ORG_NAME, points);
 	}
 
 	public void saveStorageMeasurements(List<StorageMeasurement> measurements, @NotNull @NotBlank String measurementName) {
 		if (measurements.isEmpty()) {
 			return;
 		}
-		WriteApiBlocking writeApi = influxDBClient.getWriteApiBlocking();
-		measurements.forEach(measurement -> writeApi.writePoint(InfluxConstants.BUCKET_STORAGE, InfluxConstants.ORG_NAME, createStorageMeasurementPoint(measurement, measurementName)));
+		List<Point> points = new ArrayList<>();
+		for (StorageMeasurement measurement : measurements) {
+			points.add(createStorageMeasurementPoint(measurement, measurementName));
+		}
+		WriteApiBlocking writeApiBlocking = influxDBClient.getWriteApiBlocking();
+		writeApiBlocking.writePoints(InfluxConstants.BUCKET_STORAGE, InfluxConstants.ORG_NAME, points);
 	}
 
 	public void saveStorageMeasurement(StorageMeasurement measurement, @NotNull @NotBlank String measurementName) {

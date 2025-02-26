@@ -5,6 +5,7 @@ import com.energytracker.influx.service.general.InfluxMeasurementService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
+import com.energytracker.service.ConsumerProducerLoggerMonitorService;
 import com.energytracker.service.GeneralDeviceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -20,8 +21,8 @@ public class ConsumerLoggerJob extends AbstractConsumerLoggerJob<Consumer> {
 	private final GeneralDeviceService<Consumer> consumerService;
 
 	@Autowired
-	public ConsumerLoggerJob(InfluxMeasurementService influxMeasurementService, StorageHandler storageHandler, GeneralDeviceService<Consumer> consumerService) {
-		super(influxMeasurementService, storageHandler);
+	public ConsumerLoggerJob(InfluxMeasurementService influxMeasurementService, StorageHandler storageHandler, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, GeneralDeviceService<Consumer> consumerService) {
+		super(influxMeasurementService, storageHandler, consumerProducerLoggerMonitorService);
 		this.consumerService = consumerService;
 	}
 

@@ -33,6 +33,9 @@ public class NetBalanceServiceImpl implements NetBalanceService {
 	public synchronized Map<String, Double> setNewCommercialPowerPlantLimit() {
 
 		Map<String, Double> currentBalance = influxNetBalanceService.getCurrentBalance();
+		if (currentBalance.get("currentBalance") == null) {
+			currentBalance = Map.of("currentBalance", 0.0);
+		}
 		double lastNetBalance = currentBalance.get("currentBalance");
 
 		double newFossilLimit;

@@ -3,11 +3,13 @@ package com.energytracker.quartz.jobs.producer;
 import com.energytracker.dto.WeatherResponse;
 import com.energytracker.entity.BaseProducer;
 import com.energytracker.entity.CommercialProducer;
+import com.energytracker.entity.ConsumerProducerLoggerMonitor;
 import com.energytracker.entity.Producer;
 import com.energytracker.influx.measurements.ProductionMeasurement;
 import com.energytracker.influx.service.general.InfluxMeasurementService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.StorageHandler;
+import com.energytracker.service.ConsumerProducerLoggerMonitorService;
 import com.energytracker.service.NetBalanceService;
 import com.energytracker.webclients.WeatherApiClient;
 import org.jetbrains.annotations.Nullable;
@@ -40,6 +42,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	private final WeatherApiClient weatherApiClient;
 	private final StorageHandler storageHandler;
 	private final NetBalanceService netBalanceService;
+	private final ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService;
 
 	protected abstract List<T> getActiveProducers();
 	protected abstract boolean commercial();
@@ -56,38 +59,83 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	private double biomassPowerModificator = 1.0;
 
 	@Autowired
-	public AbstractProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, NetBalanceService netBalanceService) {
+	public AbstractProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, NetBalanceService netBalanceService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService) {
 		this.influxMeasurementService = influxMeasurementService;
 		this.weatherApiClient = weatherApiClient;
 		this.storageHandler = storageHandler;
 		this.netBalanceService = netBalanceService;
+		this.consumerProducerLoggerMonitorService = consumerProducerLoggerMonitorService;
 	}
 
 	@Override
 	@Async("taskExecutor")
 	public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+
+		long startTime = System.currentTimeMillis();
+
 		List<T> activeProducers = getActiveProducers();
+		long readActiveDevicesTime = System.currentTimeMillis() - startTime;
+
 		List<ProductionMeasurement> measurementsBatch = Collections.synchronizedList(new ArrayList<>());
 		List<T> updatedProducers = Collections.synchronizedList(new ArrayList<>());
 		List<T> removedProducers = Collections.synchronizedList(new ArrayList<>());
 		Map<Long, List<ProductionMeasurement>> ownerProductionData = new ConcurrentHashMap<>();
 
+		long beforeWebRequests = System.currentTimeMillis();
 		WeatherResponse response = weatherApiClient.getWeather();
 		if (response != null) {
 			sunPowerModificator = response.getSolarPower();
 			windPowerModificator = response.getWindPower();
 		}
+		long webRequestsTime = System.currentTimeMillis() - beforeWebRequests;
 
+		long beforeProcessMethod = System.currentTimeMillis();
 		processSyncedInBatches(activeProducers, measurementsBatch, updatedProducers, removedProducers, ownerProductionData);
+		long processMethodTime = System.currentTimeMillis() - beforeProcessMethod;
 
+		long beforeUpdateStorages = System.currentTimeMillis();
 		Map<Long, Double> totalProductionOfOwnerMap = getTotalProductionByOwnerAsMap(ownerProductionData);
-		storageHandler.updateStorages(totalProductionOfOwnerMap, false);
+		int measurementsCount = storageHandler.updateStorages(totalProductionOfOwnerMap, false);
+		long updateStoragesTime = System.currentTimeMillis() - beforeUpdateStorages;
 
 		List<ProductionMeasurement> totalProductionByOwnerAndPowerTypeAndTimestamp = calculateTotalProductionByOwnerAndPowerTypeAndTimestamp(ownerProductionData);
 		List<ProductionMeasurement> totalProductionByOwnerAndByTimestamp = calculateTotalProductionByOwnerAndTimestamp(ownerProductionData);
 		List<ProductionMeasurement> totalProductionByPowerTypeAndTimestamp = calculateTotalProductionByPowerTypeAndTimestamp(ownerProductionData);
 		List<ProductionMeasurement> totalProductionByTimestamp = calculateTotalProductionByTimestamp(ownerProductionData);
+
+		measurementsCount = measurementsCount
+				+ measurementsBatch.size()
+				+ totalProductionByOwnerAndPowerTypeAndTimestamp.size()
+				+ totalProductionByOwnerAndByTimestamp.size()
+				+ totalProductionByPowerTypeAndTimestamp.size()
+				+ totalProductionByTimestamp.size();
+		int updatedProducersCount = updatedProducers.size();
+		int removedProducersCount = removedProducers.size();
+		long cpuIntensiveTime = System.currentTimeMillis() - startTime;
+
+		long beforeupdateDatabaseTime = System.currentTimeMillis();
 		updateDatabase(updatedProducers, removedProducers, measurementsBatch, totalProductionByOwnerAndPowerTypeAndTimestamp, totalProductionByOwnerAndByTimestamp, totalProductionByPowerTypeAndTimestamp, totalProductionByTimestamp);
+		long updateDatabaseTime = System.currentTimeMillis() - beforeupdateDatabaseTime;
+		long overallTime = System.currentTimeMillis() - startTime;
+
+		if (measurementsCount > 0) {
+			consumerProducerLoggerMonitorService.save(
+					new ConsumerProducerLoggerMonitor(
+							Instant.now(),
+							getClass().getSimpleName(),
+							readActiveDevicesTime,
+							processMethodTime,
+							cpuIntensiveTime,
+							updateStoragesTime,
+							updateDatabaseTime,
+							webRequestsTime,
+							overallTime,
+							updatedProducersCount,
+							removedProducersCount,
+							measurementsCount
+					)
+			);
+		}
 	}
 
 	private void processSynced(

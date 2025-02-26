@@ -3,10 +3,12 @@ package com.energytracker.quartz.jobs.consumer;
 import com.energytracker.entity.BaseConsumer;
 import com.energytracker.entity.CommercialConsumer;
 import com.energytracker.entity.Consumer;
+import com.energytracker.entity.ConsumerProducerLoggerMonitor;
 import com.energytracker.influx.measurements.ConsumptionMeasurement;
 import com.energytracker.influx.service.general.InfluxMeasurementService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.StorageHandler;
+import com.energytracker.service.ConsumerProducerLoggerMonitorService;
 import org.jetbrains.annotations.Nullable;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -37,6 +39,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 
 	private final InfluxMeasurementService influxMeasurementService;
 	private final StorageHandler storageHandler;
+	private final ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService;
 
 	protected abstract List<T> getActiveConsumers();
 	protected abstract T getConsumerById(Long id);
@@ -46,28 +49,66 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	protected abstract int getIntervalInSeconds();
 
 	@Autowired
-	public AbstractConsumerLoggerJob(InfluxMeasurementService influxMeasurementService, StorageHandler storageHandler) {
+	public AbstractConsumerLoggerJob(InfluxMeasurementService influxMeasurementService, StorageHandler storageHandler, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService) {
 		this.influxMeasurementService = influxMeasurementService;
 		this.storageHandler = storageHandler;
+		this.consumerProducerLoggerMonitorService = consumerProducerLoggerMonitorService;
 	}
 
 	@Override
 	@Async("taskExecutor")
 	public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+
+		long startTime = System.currentTimeMillis();
+
 		List<T> activeConsumers = getActiveConsumers();
+		long readActiveDevicesTime = System.currentTimeMillis() - startTime;
+
 		List<ConsumptionMeasurement> measurementsBatch = Collections.synchronizedList(new ArrayList<>());
 		List<T> updatedConsumers = Collections.synchronizedList(new ArrayList<>());
 		List<T> removedConsumers = Collections.synchronizedList(new ArrayList<>());
 		Map<Long, List<ConsumptionMeasurement>> ownerConsumptionData = new ConcurrentHashMap<>();
 
+		long beforeProcessMethod = System.currentTimeMillis();
 		processSyncedInBatches(activeConsumers, measurementsBatch, updatedConsumers, removedConsumers, ownerConsumptionData);
+		long processMethodTime = System.currentTimeMillis() - beforeProcessMethod;
 
+		long beforeUpdateStorages = System.currentTimeMillis();
 		Map<Long, Double> totalConsumptionOfOwnerMap = getTotalConsumptionByOwnerAsMap(ownerConsumptionData);
-		storageHandler.updateStorages(totalConsumptionOfOwnerMap, true);
+		int measurementsCount = storageHandler.updateStorages(totalConsumptionOfOwnerMap, true);
+		long updateStoragesTime = System.currentTimeMillis() - beforeUpdateStorages;
 
 		List<ConsumptionMeasurement> totalConsumptionOfOwnerByTimestamp = calculateTotalConsumptionByOwnerAndTimestamp(ownerConsumptionData);
 		List<ConsumptionMeasurement> totalConsumptionByTimestamp = calculateTotalConsumptionByTimestamp(ownerConsumptionData);
+
+		measurementsCount = measurementsCount + measurementsBatch.size() + totalConsumptionOfOwnerByTimestamp.size() + totalConsumptionByTimestamp.size();
+		int updatedConsumersCount = updatedConsumers.size();
+		int removedConsumersCount = removedConsumers.size();
+		long cpuIntensiveTime = System.currentTimeMillis() - startTime;
+
+		long beforeUpdateDatabaseTime = System.currentTimeMillis();
 		updateDatabase(updatedConsumers, removedConsumers, measurementsBatch, totalConsumptionOfOwnerByTimestamp, totalConsumptionByTimestamp);
+		long updateDatabaseTime = System.currentTimeMillis() - beforeUpdateDatabaseTime;
+		long overallTime = System.currentTimeMillis() - startTime;
+
+		if (measurementsCount > 0) {
+			consumerProducerLoggerMonitorService.save(
+					new ConsumerProducerLoggerMonitor(
+							Instant.now(),
+							getClass().getSimpleName(),
+							readActiveDevicesTime,
+							processMethodTime,
+							cpuIntensiveTime,
+							updateStoragesTime,
+							updateDatabaseTime,
+							0L,
+							overallTime,
+							updatedConsumersCount,
+							removedConsumersCount,
+							measurementsCount
+					)
+			);
+		}
 	}
 
 	private void processSynced(
@@ -373,7 +414,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 				Instant timestamp = measurement.getTimestamp();
 				double consumption = measurement.getConsumption();
 
-				// Füge Werte mit gleichem Zeitstempel zusammen
+				// Füge Verbrauch mit gleichem Zeitstempel zusammen, also Gesamtverbrauch aller Geräte zu diesem Zeitstempel
 				consumptionByTimestamp.merge(timestamp, consumption, Double::sum);
 			}
 

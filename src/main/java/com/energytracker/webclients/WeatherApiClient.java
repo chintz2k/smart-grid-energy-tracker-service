@@ -23,7 +23,7 @@ public class WeatherApiClient {
 		this.tokenService = tokenService;
 	}
 
-	// Abrufen von Wetterdaten über Registry-Service (Eureka)
+	// Abrufen von Wetterdaten über Registry-Service (Eureka, Load Balancer)
 	public WeatherResponse getWeather() {
 		String url = "http://weather-api/weather"; // Der Service-Name, nicht die IP/Port
 		String accessToken = tokenService.getAccessToken();
@@ -43,7 +43,7 @@ public class WeatherApiClient {
 				WeatherResponse.class
 		);
 
-		return response.getBody(); // Körper der Antwort zurückgeben
+		return response.getBody();
 	}
 
 }

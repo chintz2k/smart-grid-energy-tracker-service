@@ -44,13 +44,14 @@ public class StorageHandler {
 		this.influxDBClient = influxDBClient;
 	}
 
-	public void updateStorages(Map<Long, Double> totalConsumptionOrProductionOfOwnerMap, boolean isConsumption) {
+	public int updateStorages(Map<Long, Double> totalConsumptionOrProductionOfOwnerMap, boolean isConsumption) {
 		lock.lock();
+		int measurementsCount;
 		try {
 			if (isConsumption) {
-				updateStoragesConsumption(totalConsumptionOrProductionOfOwnerMap);
+				measurementsCount = updateStoragesConsumption(totalConsumptionOrProductionOfOwnerMap);
 			} else {
-				updateStoragesProduction(totalConsumptionOrProductionOfOwnerMap);
+				measurementsCount = updateStoragesProduction(totalConsumptionOrProductionOfOwnerMap);
 			}
 		} catch (Exception e) {
 			if (isConsumption) {
@@ -62,9 +63,10 @@ public class StorageHandler {
 		} finally {
 			lock.unlock();
 		}
+		return measurementsCount;
 	}
 
-	private void updateStoragesConsumption(Map<Long, Double> totalConsumptionOfOwnerMap) {
+	private int updateStoragesConsumption(Map<Long, Double> totalConsumptionOfOwnerMap) {
 		List<StorageMeasurement> commercialStorageMeasurements = Collections.synchronizedList(new ArrayList<>());
 		List<StorageMeasurement> storageMeasurements = Collections.synchronizedList(new ArrayList<>());
 		NetMeasurement measurement = null;
@@ -111,10 +113,10 @@ public class StorageHandler {
 				measurement.setChange(netProductionChange);
 			}
 		}
-		updateDatabase(commercialStorageMeasurements, storageMeasurements, measurement);
+		return updateDatabase(commercialStorageMeasurements, storageMeasurements, measurement);
 	}
 
-	private void updateStoragesProduction(Map<Long, Double> totalProductionOfOwnerMap) {
+	private int updateStoragesProduction(Map<Long, Double> totalProductionOfOwnerMap) {
 		List<StorageMeasurement> commercialStorageMeasurements = Collections.synchronizedList(new ArrayList<>());
 		List<StorageMeasurement> storageMeasurements = Collections.synchronizedList(new ArrayList<>());
 		NetMeasurement measurement = null;
@@ -160,10 +162,10 @@ public class StorageHandler {
 				measurement.setChange(netProduction);
 			}
 		}
-		updateDatabase(commercialStorageMeasurements, storageMeasurements, measurement);
+		return updateDatabase(commercialStorageMeasurements, storageMeasurements, measurement);
 	}
 
-	public synchronized double getCurrentBalanceFromNetMeasurement() {
+	private synchronized double getCurrentBalanceFromNetMeasurement() {
 		String fluxQuery = String.format(
 				"from(bucket: \"%s\") "
 						+ "|> range(start: -30d) "
@@ -294,7 +296,7 @@ public class StorageHandler {
 		return measurement;
 	}
 
-	private void updateDatabase(List<StorageMeasurement> commercialStorageMeasurements, List<StorageMeasurement> storageMeasurements, NetMeasurement netMeasurement) {
+	private int updateDatabase(List<StorageMeasurement> commercialStorageMeasurements, List<StorageMeasurement> storageMeasurements, NetMeasurement netMeasurement) {
 
 		if (!commercialStorageMeasurements.isEmpty()) {
 			influxMeasurementService.saveStorageMeasurements(commercialStorageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL);
@@ -307,5 +309,7 @@ public class StorageHandler {
 		if (netMeasurement != null) {
 			influxMeasurementService.saveNetMeasurement(netMeasurement, InfluxConstants.MEASUREMENT_NAME_NET);
 		}
+
+		return commercialStorageMeasurements.size() + storageMeasurements.size() + (netMeasurement != null ? 1 : 0);
 	}
 }
