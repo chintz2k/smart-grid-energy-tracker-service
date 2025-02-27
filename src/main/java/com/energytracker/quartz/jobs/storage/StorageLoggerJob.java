@@ -68,16 +68,26 @@ public class StorageLoggerJob implements Job {
 		monitor.setOverallCount(monitor.getCommercialStoragesCount() + monitor.getPrivateStoragesCount());
 
 		long beforeTotalStoragesUpdateDatabase = System.currentTimeMillis();
-		influxService.saveStorageMeasurement(privateStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_PRIVATE);
-		influxService.saveStorageMeasurement(commercialStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_COMMERCIAL);
+		if (privateStorages != null) {
+			influxService.saveStorageMeasurement(privateStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_PRIVATE);
+		}
+		if (commercialStorages != null) {
+			influxService.saveStorageMeasurement(commercialStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_COMMERCIAL);
+		}
 
-		StorageMeasurement totalStorages = new StorageMeasurement();
-		totalStorages.setTimestamp(time);
-		totalStorages.setDeviceId(null);
-		totalStorages.setOwnerId(null);
-		totalStorages.setCurrentCharge(privateStorages.getCurrentCharge() + commercialStorages.getCurrentCharge());
-		totalStorages.setCapacity(privateStorages.getCapacity() + commercialStorages.getCapacity());
-		influxService.saveStorageMeasurement(totalStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_TOTAL);
+		if (privateStorages != null || commercialStorages != null) {
+			StorageMeasurement totalStorages = new StorageMeasurement();
+			totalStorages.setTimestamp(time);
+			totalStorages.setDeviceId(null);
+			totalStorages.setOwnerId(null);
+			double privateCharge = privateStorages != null ? privateStorages.getCurrentCharge() : 0;
+			double commercialCharge = commercialStorages != null ? commercialStorages.getCurrentCharge() : 0;
+			totalStorages.setCurrentCharge(privateCharge + commercialCharge);
+			double privateCapacity = privateStorages != null ? privateStorages.getCapacity() : 0;
+			double commercialCapacity = commercialStorages != null ? commercialStorages.getCapacity() : 0;
+			totalStorages.setCapacity(privateCapacity + commercialCapacity);
+			influxService.saveStorageMeasurement(totalStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_TOTAL);
+		}
 		long totalStoragesUpdateDatabaseTime = System.currentTimeMillis() - beforeTotalStoragesUpdateDatabase;
 
 		monitor.setTotalStoragesUpdateDatabaseTime(totalStoragesUpdateDatabaseTime);
@@ -154,12 +164,15 @@ public class StorageLoggerJob implements Job {
 		}
 		influxService.saveStorageMeasurements(measurements, InfluxConstants.MEASUREMENT_NAME_STORAGE_OWNER);
 
-		StorageMeasurement measurement = new StorageMeasurement();
-		measurement.setTimestamp(time);
-		measurement.setDeviceId(null);
-		measurement.setOwnerId(null);
-		measurement.setCurrentCharge(currentCharge);
-		measurement.setCapacity(capacity);
+		StorageMeasurement measurement = null;
+		if (!measurements.isEmpty()) {
+			measurement = new StorageMeasurement();
+			measurement.setTimestamp(time);
+			measurement.setDeviceId(null);
+			measurement.setOwnerId(null);
+			measurement.setCurrentCharge(currentCharge);
+			measurement.setCapacity(capacity);
+		}
 		long databaseUpdateTime = System.currentTimeMillis() - beforeDatabaseUpdate;
 
 		monitor.setCommercialStoragesCount(measurements.size() + 1);
