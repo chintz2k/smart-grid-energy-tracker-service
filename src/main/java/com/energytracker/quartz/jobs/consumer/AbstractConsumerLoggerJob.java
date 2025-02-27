@@ -1,14 +1,14 @@
 package com.energytracker.quartz.jobs.consumer;
 
-import com.energytracker.entity.BaseConsumer;
-import com.energytracker.entity.CommercialConsumer;
-import com.energytracker.entity.Consumer;
-import com.energytracker.entity.ConsumerProducerLoggerMonitor;
-import com.energytracker.influx.measurements.ConsumptionMeasurement;
-import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.entity.devices.CommercialConsumer;
+import com.energytracker.entity.devices.Consumer;
+import com.energytracker.entity.devices.bases.BaseConsumer;
+import com.energytracker.entity.monitoring.ConsumerProducerLoggerMonitor;
+import com.energytracker.influx.measurements.devices.ConsumptionMeasurement;
+import com.energytracker.influx.service.general.InfluxService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.StorageHandler;
-import com.energytracker.service.ConsumerProducerLoggerMonitorService;
+import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService;
 import org.jetbrains.annotations.Nullable;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -37,7 +37,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 
 	private static final int BATCH_SIZE = 500;
 
-	private final InfluxMeasurementService influxMeasurementService;
+	private final InfluxService influxService;
 	private final StorageHandler storageHandler;
 	private final ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService;
 
@@ -49,8 +49,8 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	protected abstract int getIntervalInSeconds();
 
 	@Autowired
-	public AbstractConsumerLoggerJob(InfluxMeasurementService influxMeasurementService, StorageHandler storageHandler, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService) {
-		this.influxMeasurementService = influxMeasurementService;
+	public AbstractConsumerLoggerJob(InfluxService influxService, StorageHandler storageHandler, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService) {
+		this.influxService = influxService;
 		this.storageHandler = storageHandler;
 		this.consumerProducerLoggerMonitorService = consumerProducerLoggerMonitorService;
 	}
@@ -165,15 +165,15 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		}
 
 		if (!measurementsBatch.isEmpty()) {
-			influxMeasurementService.saveConsumptionMeasurements(measurementsBatch, getMeasurementName());
+			influxService.saveConsumptionMeasurements(measurementsBatch, getMeasurementName());
 		}
 
 		if (!totalConsumptionOfOwnerByTimestamp.isEmpty()) {
-			influxMeasurementService.saveConsumptionMeasurements(totalConsumptionOfOwnerByTimestamp, InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_OWNER);
+			influxService.saveConsumptionMeasurements(totalConsumptionOfOwnerByTimestamp, InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_OWNER);
 		}
 
 		if (!totalConsumptionByTimestamp.isEmpty()) {
-			influxMeasurementService.saveConsumptionMeasurements(totalConsumptionByTimestamp, InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_TOTAL);
+			influxService.saveConsumptionMeasurements(totalConsumptionByTimestamp, InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_TOTAL);
 		}
 
 		if (!removedConsumers.isEmpty()) {

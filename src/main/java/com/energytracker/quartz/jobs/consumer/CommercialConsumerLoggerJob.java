@@ -1,12 +1,12 @@
 package com.energytracker.quartz.jobs.consumer;
 
-import com.energytracker.entity.CommercialConsumer;
-import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.entity.devices.CommercialConsumer;
+import com.energytracker.influx.service.general.InfluxService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
-import com.energytracker.service.ConsumerProducerLoggerMonitorService;
-import com.energytracker.service.GeneralDeviceService;
+import com.energytracker.service.general.GeneralDeviceService;
+import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -21,8 +21,8 @@ public class CommercialConsumerLoggerJob extends AbstractConsumerLoggerJob<Comme
 	private final GeneralDeviceService<CommercialConsumer> commercialConsumerService;
 
 	@Autowired
-	public CommercialConsumerLoggerJob(InfluxMeasurementService influxMeasurementService, StorageHandler storageHandler, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, GeneralDeviceService<CommercialConsumer> commercialConsumerService) {
-		super(influxMeasurementService, storageHandler, consumerProducerLoggerMonitorService);
+	public CommercialConsumerLoggerJob(InfluxService influxService, StorageHandler storageHandler, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, GeneralDeviceService<CommercialConsumer> commercialConsumerService) {
+		super(influxService, storageHandler, consumerProducerLoggerMonitorService);
 		this.commercialConsumerService = commercialConsumerService;
 	}
 

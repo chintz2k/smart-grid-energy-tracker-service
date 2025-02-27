@@ -1,13 +1,13 @@
 package com.energytracker.quartz.jobs.producer;
 
-import com.energytracker.entity.Producer;
-import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.entity.devices.Producer;
+import com.energytracker.influx.service.general.InfluxService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
-import com.energytracker.service.ConsumerProducerLoggerMonitorService;
-import com.energytracker.service.GeneralDeviceService;
-import com.energytracker.service.NetBalanceService;
+import com.energytracker.service.general.GeneralDeviceService;
+import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService;
+import com.energytracker.service.net.PowerPlantLimitsService;
 import com.energytracker.webclients.WeatherApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -23,8 +23,8 @@ public class ProducerLoggerJob extends AbstractProducerLoggerJob<Producer> {
 	private final GeneralDeviceService<Producer> producerService;
 
 	@Autowired
-	public ProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, NetBalanceService netBalanceService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, GeneralDeviceService<Producer> producerService) {
-		super(influxMeasurementService, weatherApiClient, storageHandler, netBalanceService, consumerProducerLoggerMonitorService);
+	public ProducerLoggerJob(InfluxService influxService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, PowerPlantLimitsService powerPlantLimitsService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, GeneralDeviceService<Producer> producerService) {
+		super(influxService, weatherApiClient, storageHandler, powerPlantLimitsService, consumerProducerLoggerMonitorService);
 		this.producerService = producerService;
 	}
 

@@ -1,14 +1,14 @@
 package com.energytracker.quartz.jobs.storage;
 
-import com.energytracker.entity.CommercialStorage;
-import com.energytracker.entity.Storage;
-import com.energytracker.entity.StorageLoggerMonitor;
-import com.energytracker.influx.measurements.StorageMeasurement;
-import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.entity.devices.CommercialStorage;
+import com.energytracker.entity.devices.Storage;
+import com.energytracker.entity.monitoring.StorageLoggerMonitor;
+import com.energytracker.influx.measurements.devices.StorageMeasurement;
+import com.energytracker.influx.service.general.InfluxService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.influx.util.InfluxQueryHelper;
-import com.energytracker.service.GeneralDeviceService;
-import com.energytracker.service.StorageLoggerMonitorService;
+import com.energytracker.service.general.GeneralDeviceService;
+import com.energytracker.service.monitoring.StorageLoggerMonitorService;
 import com.influxdb.query.FluxRecord;
 import com.influxdb.query.FluxTable;
 import org.quartz.Job;
@@ -26,15 +26,15 @@ import java.util.*;
 @Component
 public class StorageLoggerJob implements Job {
 
-	private final InfluxMeasurementService influxMeasurementService;
+	private final InfluxService influxService;
 	private final InfluxQueryHelper influxQueryHelper;
 	private final GeneralDeviceService<CommercialStorage> commercialStorageService;
 	private final GeneralDeviceService<Storage> storageService;
 	private final StorageLoggerMonitorService storageLoggerMonitorService;
 
 	@Autowired
-	public StorageLoggerJob(InfluxMeasurementService influxMeasurementService, InfluxQueryHelper influxQueryHelper, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService, StorageLoggerMonitorService storageLoggerMonitorService) {
-		this.influxMeasurementService = influxMeasurementService;
+	public StorageLoggerJob(InfluxService influxService, InfluxQueryHelper influxQueryHelper, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService, StorageLoggerMonitorService storageLoggerMonitorService) {
+		this.influxService = influxService;
 		this.influxQueryHelper = influxQueryHelper;
 		this.commercialStorageService = commercialStorageService;
 		this.storageService = storageService;
@@ -68,8 +68,8 @@ public class StorageLoggerJob implements Job {
 		monitor.setOverallCount(monitor.getCommercialStoragesCount() + monitor.getPrivateStoragesCount());
 
 		long beforeTotalStoragesUpdateDatabase = System.currentTimeMillis();
-		influxMeasurementService.saveStorageMeasurement(privateStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_PRIVATE);
-		influxMeasurementService.saveStorageMeasurement(commercialStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_COMMERCIAL);
+		influxService.saveStorageMeasurement(privateStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_PRIVATE);
+		influxService.saveStorageMeasurement(commercialStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_COMMERCIAL);
 
 		StorageMeasurement totalStorages = new StorageMeasurement();
 		totalStorages.setTimestamp(time);
@@ -77,7 +77,7 @@ public class StorageLoggerJob implements Job {
 		totalStorages.setOwnerId(null);
 		totalStorages.setCurrentCharge(privateStorages.getCurrentCharge() + commercialStorages.getCurrentCharge());
 		totalStorages.setCapacity(privateStorages.getCapacity() + commercialStorages.getCapacity());
-		influxMeasurementService.saveStorageMeasurement(totalStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_TOTAL);
+		influxService.saveStorageMeasurement(totalStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_TOTAL);
 		long totalStoragesUpdateDatabaseTime = System.currentTimeMillis() - beforeTotalStoragesUpdateDatabase;
 
 		monitor.setTotalStoragesUpdateDatabaseTime(totalStoragesUpdateDatabaseTime);
@@ -152,7 +152,7 @@ public class StorageLoggerJob implements Job {
 			currentCharge += entry.getValue();
 			capacity += capacityOfDevice.get(entry.getKey());
 		}
-		influxMeasurementService.saveStorageMeasurements(measurements, InfluxConstants.MEASUREMENT_NAME_STORAGE_OWNER);
+		influxService.saveStorageMeasurements(measurements, InfluxConstants.MEASUREMENT_NAME_STORAGE_OWNER);
 
 		StorageMeasurement measurement = new StorageMeasurement();
 		measurement.setTimestamp(time);

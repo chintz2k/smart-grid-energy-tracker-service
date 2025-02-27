@@ -1,13 +1,13 @@
 package com.energytracker.quartz.jobs.producer;
 
-import com.energytracker.entity.CommercialProducer;
-import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.entity.devices.CommercialProducer;
+import com.energytracker.influx.service.general.InfluxService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
-import com.energytracker.service.ConsumerProducerLoggerMonitorService;
-import com.energytracker.service.GeneralDeviceService;
-import com.energytracker.service.NetBalanceService;
+import com.energytracker.service.general.GeneralDeviceService;
+import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService;
+import com.energytracker.service.net.PowerPlantLimitsService;
 import com.energytracker.webclients.WeatherApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -23,8 +23,8 @@ public class CommercialProducerLoggerJob extends AbstractProducerLoggerJob<Comme
 	private final GeneralDeviceService<CommercialProducer> commercialProducerService;
 
 	@Autowired
-	public CommercialProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, NetBalanceService netBalanceService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, GeneralDeviceService<CommercialProducer> commercialProducerService) {
-		super(influxMeasurementService, weatherApiClient, storageHandler, netBalanceService, consumerProducerLoggerMonitorService);
+	public CommercialProducerLoggerJob(InfluxService influxService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, PowerPlantLimitsService powerPlantLimitsService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, GeneralDeviceService<CommercialProducer> commercialProducerService) {
+		super(influxService, weatherApiClient, storageHandler, powerPlantLimitsService, consumerProducerLoggerMonitorService);
 		this.commercialProducerService = commercialProducerService;
 	}
 

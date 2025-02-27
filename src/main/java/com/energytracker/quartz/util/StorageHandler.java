@@ -1,13 +1,13 @@
 package com.energytracker.quartz.util;
 
-import com.energytracker.entity.BaseStorage;
-import com.energytracker.entity.CommercialStorage;
-import com.energytracker.entity.Storage;
-import com.energytracker.influx.measurements.NetMeasurement;
-import com.energytracker.influx.measurements.StorageMeasurement;
-import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.entity.devices.CommercialStorage;
+import com.energytracker.entity.devices.Storage;
+import com.energytracker.entity.devices.bases.BaseStorage;
+import com.energytracker.influx.measurements.devices.StorageMeasurement;
+import com.energytracker.influx.measurements.net.NetBalanceMeasurement;
+import com.energytracker.influx.service.general.InfluxService;
 import com.energytracker.influx.util.InfluxConstants;
-import com.energytracker.service.GeneralDeviceService;
+import com.energytracker.service.general.GeneralDeviceService;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.query.FluxRecord;
 import com.influxdb.query.FluxTable;
@@ -31,14 +31,14 @@ public class StorageHandler {
 
 	private static final ReentrantLock lock = new ReentrantLock(true);
 
-	private final InfluxMeasurementService influxMeasurementService;
+	private final InfluxService influxService;
 	private final GeneralDeviceService<CommercialStorage> commercialStorageService;
 	private final GeneralDeviceService<Storage> storageService;
 	private final InfluxDBClient influxDBClient;
 
 	@Autowired
-	public StorageHandler(InfluxMeasurementService influxMeasurementService, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService, InfluxDBClient influxDBClient) {
-		this.influxMeasurementService = influxMeasurementService;
+	public StorageHandler(InfluxService influxService, GeneralDeviceService<CommercialStorage> commercialStorageService, GeneralDeviceService<Storage> storageService, InfluxDBClient influxDBClient) {
+		this.influxService = influxService;
 		this.commercialStorageService = commercialStorageService;
 		this.storageService = storageService;
 		this.influxDBClient = influxDBClient;
@@ -69,7 +69,7 @@ public class StorageHandler {
 	private int updateStoragesConsumption(Map<Long, Double> totalConsumptionOfOwnerMap) {
 		List<StorageMeasurement> commercialStorageMeasurements = Collections.synchronizedList(new ArrayList<>());
 		List<StorageMeasurement> storageMeasurements = Collections.synchronizedList(new ArrayList<>());
-		NetMeasurement measurement = null;
+		NetBalanceMeasurement measurement = null;
 
 		List<CommercialStorage> commercialStorages = commercialStorageService.getAll();
 		List<Storage> storages = storageService.getAll();
@@ -104,7 +104,7 @@ public class StorageHandler {
 
 			// Falls immer noch Rest übrig ist, loggen wir diesen, da er nicht abgedeckt werden konnte
 			if (netConsumption > 0) {
-				measurement = new NetMeasurement();
+				measurement = new NetBalanceMeasurement();
 				measurement.setTimestamp(time);
 				double netBalance = getCurrentBalanceFromNetMeasurement();
 				netBalance -= netConsumption;
@@ -119,7 +119,7 @@ public class StorageHandler {
 	private int updateStoragesProduction(Map<Long, Double> totalProductionOfOwnerMap) {
 		List<StorageMeasurement> commercialStorageMeasurements = Collections.synchronizedList(new ArrayList<>());
 		List<StorageMeasurement> storageMeasurements = Collections.synchronizedList(new ArrayList<>());
-		NetMeasurement measurement = null;
+		NetBalanceMeasurement measurement = null;
 
 		List<CommercialStorage> commercialStorages = commercialStorageService.getAll();
 		List<Storage> storages = storageService.getAll();
@@ -154,7 +154,7 @@ public class StorageHandler {
 
 			// Falls immer noch Rest übrig ist, loggen wir diesen, da er nicht abgedeckt werden konnte
 			if (netProduction > 0) {
-				measurement = new NetMeasurement();
+				measurement = new NetBalanceMeasurement();
 				measurement.setTimestamp(time);
 				double netBalance = getCurrentBalanceFromNetMeasurement();
 				netBalance += netProduction;
@@ -296,20 +296,20 @@ public class StorageHandler {
 		return measurement;
 	}
 
-	private int updateDatabase(List<StorageMeasurement> commercialStorageMeasurements, List<StorageMeasurement> storageMeasurements, NetMeasurement netMeasurement) {
+	private int updateDatabase(List<StorageMeasurement> commercialStorageMeasurements, List<StorageMeasurement> storageMeasurements, NetBalanceMeasurement netBalanceMeasurement) {
 
 		if (!commercialStorageMeasurements.isEmpty()) {
-			influxMeasurementService.saveStorageMeasurements(commercialStorageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL);
+			influxService.saveStorageMeasurements(commercialStorageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL);
 		}
 
 		if (!storageMeasurements.isEmpty()) {
-			influxMeasurementService.saveStorageMeasurements(storageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE);
+			influxService.saveStorageMeasurements(storageMeasurements, InfluxConstants.MEASUREMENT_NAME_STORAGE);
 		}
 
-		if (netMeasurement != null) {
-			influxMeasurementService.saveNetMeasurement(netMeasurement, InfluxConstants.MEASUREMENT_NAME_NET);
+		if (netBalanceMeasurement != null) {
+			influxService.saveNetMeasurement(netBalanceMeasurement, InfluxConstants.MEASUREMENT_NAME_NET);
 		}
 
-		return commercialStorageMeasurements.size() + storageMeasurements.size() + (netMeasurement != null ? 1 : 0);
+		return commercialStorageMeasurements.size() + storageMeasurements.size() + (netBalanceMeasurement != null ? 1 : 0);
 	}
 }

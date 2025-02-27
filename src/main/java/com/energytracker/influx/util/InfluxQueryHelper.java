@@ -1,6 +1,6 @@
 package com.energytracker.influx.util;
 
-import com.energytracker.exception.InvalidTimeFormatForInflux;
+import com.energytracker.exception.exceptions.InvalidTimeFormatForInflux;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.query.FluxTable;
 import jakarta.validation.constraints.NotBlank;
@@ -87,7 +87,7 @@ public class InfluxQueryHelper {
 	}
 
 	private String addOwners(List<Long> ownerIds) {
-		String ownerString = "";
+		String ownerString;
 		if (ownerIds == null || ownerIds.isEmpty()) {
 			return "";
 		}
@@ -109,7 +109,7 @@ public class InfluxQueryHelper {
 	}
 
 	private String addDevices(List<Long> deviceIds) {
-		String deviceString = "";
+		String deviceString;
 		if (deviceIds == null || deviceIds.isEmpty()) {
 			return "";
 		}
@@ -222,15 +222,5 @@ public class InfluxQueryHelper {
 		}
 
 		return String.format("|> range(start: %s, stop: %s)", start, end);
-	}
-
-	public List<Long> trimKommaSeparatedIds(String ids) {
-		String[] idArray = ids.split(",");
-		List<Long> trimmedIds = new ArrayList<>();
-		for (String id : idArray) {
-			String trimmedId = id.trim();
-			trimmedIds.add(Long.valueOf(trimmedId));
-		}
-		return trimmedIds;
 	}
 }

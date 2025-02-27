@@ -1,7 +1,7 @@
 package com.energytracker.security;
 
-import com.energytracker.exception.UnauthorizedAccessException;
-import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.exception.exceptions.UnauthorizedAccessException;
+import com.energytracker.influx.service.general.InfluxService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -18,12 +18,12 @@ import java.util.List;
 public class SecurityService {
 
 	private final JwtUtil jwtUtil;
-	private final InfluxMeasurementService influxMeasurementService;
+	private final InfluxService influxService;
 
 	@Autowired
-	public SecurityService(JwtUtil jwtUtil, InfluxMeasurementService influxMeasurementService) {
+	public SecurityService(JwtUtil jwtUtil, InfluxService influxService) {
 		this.jwtUtil = jwtUtil;
-		this.influxMeasurementService = influxMeasurementService;
+		this.influxService = influxService;
 	}
 
 	public Long extractUserIdFromPrincipal(Object principal) {
@@ -72,7 +72,7 @@ public class SecurityService {
 		Long ownerId = getCurrentUserId();
 		if (deviceId != null) {
 			if (!getCurrentUserRole().equals("ROLE_ADMIN") && !getCurrentUserRole().equals("ROLE_SYSTEM")) {
-				if (!ownerId.equals(influxMeasurementService.getDeviceOwnerId(deviceId))) {
+				if (!ownerId.equals(influxService.getDeviceOwnerId(deviceId))) {
 					throw new UnauthorizedAccessException("Unauthorized access to consumer with ID " + deviceId + " for user with ID " + ownerId);
 				}
 			}
@@ -93,7 +93,7 @@ public class SecurityService {
 		List<Long> result = new ArrayList<>();
 		for (Long id : rawList) {
 			if (!getCurrentUserRole().equals("ROLE_ADMIN") && !getCurrentUserRole().equals("ROLE_SYSTEM")) {
-				if (ownerId.equals(influxMeasurementService.getDeviceOwnerId(id))) {
+				if (ownerId.equals(influxService.getDeviceOwnerId(id))) {
 					result.add(id);
 				}
 			} else {

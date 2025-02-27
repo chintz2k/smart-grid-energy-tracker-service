@@ -1,16 +1,16 @@
 package com.energytracker.quartz.jobs.producer;
 
 import com.energytracker.dto.WeatherResponse;
-import com.energytracker.entity.BaseProducer;
-import com.energytracker.entity.CommercialProducer;
-import com.energytracker.entity.ConsumerProducerLoggerMonitor;
-import com.energytracker.entity.Producer;
-import com.energytracker.influx.measurements.ProductionMeasurement;
-import com.energytracker.influx.service.general.InfluxMeasurementService;
+import com.energytracker.entity.devices.CommercialProducer;
+import com.energytracker.entity.devices.Producer;
+import com.energytracker.entity.devices.bases.BaseProducer;
+import com.energytracker.entity.monitoring.ConsumerProducerLoggerMonitor;
+import com.energytracker.influx.measurements.devices.ProductionMeasurement;
+import com.energytracker.influx.service.general.InfluxService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.StorageHandler;
-import com.energytracker.service.ConsumerProducerLoggerMonitorService;
-import com.energytracker.service.NetBalanceService;
+import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService;
+import com.energytracker.service.net.PowerPlantLimitsService;
 import com.energytracker.webclients.WeatherApiClient;
 import org.jetbrains.annotations.Nullable;
 import org.quartz.Job;
@@ -38,10 +38,10 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 
 	private static final int BATCH_SIZE = 500;
 
-	private final InfluxMeasurementService influxMeasurementService;
+	private final InfluxService influxService;
 	private final WeatherApiClient weatherApiClient;
 	private final StorageHandler storageHandler;
-	private final NetBalanceService netBalanceService;
+	private final PowerPlantLimitsService powerPlantLimitsService;
 	private final ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService;
 
 	protected abstract List<T> getActiveProducers();
@@ -59,11 +59,11 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	private double biomassPowerModificator = 1.0;
 
 	@Autowired
-	public AbstractProducerLoggerJob(InfluxMeasurementService influxMeasurementService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, NetBalanceService netBalanceService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService) {
-		this.influxMeasurementService = influxMeasurementService;
+	public AbstractProducerLoggerJob(InfluxService influxService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, PowerPlantLimitsService powerPlantLimitsService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService) {
+		this.influxService = influxService;
 		this.weatherApiClient = weatherApiClient;
 		this.storageHandler = storageHandler;
-		this.netBalanceService = netBalanceService;
+		this.powerPlantLimitsService = powerPlantLimitsService;
 		this.consumerProducerLoggerMonitorService = consumerProducerLoggerMonitorService;
 	}
 
@@ -194,23 +194,23 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		}
 
 		if (!measurementsBatch.isEmpty()) {
-			influxMeasurementService.saveProductionMeasurements(measurementsBatch, getMeasurementName());
+			influxService.saveProductionMeasurements(measurementsBatch, getMeasurementName());
 		}
 
 		if (!totalProductionByOwnerAndPowerTypeAndTimestamp.isEmpty()) {
-			influxMeasurementService.saveProductionMeasurements(totalProductionByOwnerAndPowerTypeAndTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
+			influxService.saveProductionMeasurements(totalProductionByOwnerAndPowerTypeAndTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
 		}
 
 		if (!totalProductionOfOwnerByTimestamp.isEmpty()) {
-			influxMeasurementService.saveProductionMeasurements(totalProductionOfOwnerByTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
+			influxService.saveProductionMeasurements(totalProductionOfOwnerByTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
 		}
 
 		if (!totalProductionByPowerTypeAndTimestamp.isEmpty()) {
-			influxMeasurementService.saveProductionMeasurements(totalProductionByPowerTypeAndTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
+			influxService.saveProductionMeasurements(totalProductionByPowerTypeAndTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
 		}
 
 		if (!totalProductionByTimestamp.isEmpty()) {
-			influxMeasurementService.saveProductionMeasurements(totalProductionByTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
+			influxService.saveProductionMeasurements(totalProductionByTimestamp, InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
 		}
 
 		if (!removedProducers.isEmpty()) {
@@ -365,8 +365,8 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	}
 
 	private double getProduction(T producer, long durationInMilliseconds) {
-		double commercialPowerPlantLimitForFossil = commercial() ? netBalanceService.getCommercialPowerPlantLimitForFossil() : 1.0;
-		double commercialPowerPlantLimitForRenewable = commercial() ? netBalanceService.getCommercialPowerPlantLimitForRenewable() : 1.0;
+		double commercialPowerPlantLimitForFossil = commercial() ? powerPlantLimitsService.getCommercialPowerPlantLimitForFossil() : 1.0;
+		double commercialPowerPlantLimitForRenewable = commercial() ? powerPlantLimitsService.getCommercialPowerPlantLimitForRenewable() : 1.0;
 		return switch (producer.getPowerType()) {
 			case "Solar Power" ->
 					(((producer.getPowerProduction() / 1000.0) * (durationInMilliseconds / (1000.0 * 3600.0)) * sunPowerModificator) * commercialPowerPlantLimitForRenewable);
