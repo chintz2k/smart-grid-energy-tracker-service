@@ -88,15 +88,14 @@ public class StorageLoggerJob implements Job {
 			totalStorages.setCapacity(privateCapacity + commercialCapacity);
 			influxService.saveStorageMeasurement(totalStorages, InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_TOTAL);
 		}
-		long totalStoragesUpdateDatabaseTime = System.currentTimeMillis() - beforeTotalStoragesUpdateDatabase;
 
-		monitor.setTotalStoragesUpdateDatabaseTime(totalStoragesUpdateDatabaseTime);
-
-		monitor.setOverallTime(System.currentTimeMillis() - start);
-
-		monitor.setTimestamp(Instant.now());
-		storageLoggerMonitorService.save(monitor);
-
+		if (privateStorages != null || commercialStorages != null) {
+			long totalStoragesUpdateDatabaseTime = System.currentTimeMillis() - beforeTotalStoragesUpdateDatabase;
+			monitor.setTotalStoragesUpdateDatabaseTime(totalStoragesUpdateDatabaseTime);
+			monitor.setOverallTime(System.currentTimeMillis() - start);
+			monitor.setTimestamp(Instant.now());
+			storageLoggerMonitorService.save(monitor);
+		}
 	}
 
 	public StorageMeasurement saveCurrentStatusStorages(
