@@ -10,20 +10,18 @@ public class QuartzIntervals {
 
 	// TODO Vor Release auf jeden Fall die Intervalle anpassen!
 
-	public static final int COMMERCIAL_CONSUMER_INTERVAL = 5;
-	public static final int COMMERCIAL_PRODUCER_INTERVAL = 5;
+	public static final int COMMERCIAL_CONSUMER_INTERVAL = 60;
+	public static final int COMMERCIAL_PRODUCER_INTERVAL = 60;
 
-	public static final int CONSUMER_INTERVAL = 5;
-	public static final int PRODUCER_INTERVAL = 5;
+	public static final int CONSUMER_INTERVAL = 60;
+	public static final int PRODUCER_INTERVAL = 60;
 
-	public static final String COMMERCIAL_CONSUMER_CRON_JOB = "0 * * * * ?";
-	public static final String COMMERCIAL_PRODUCER_CRON_JOB = "0 * * * * ?";
+	public static final String COMMERCIAL_CONSUMER_CRON_JOB = "0 0/5 * * * ?";
+	public static final String COMMERCIAL_PRODUCER_CRON_JOB = "0 0/5 * * * ?";
 
-	public static final String CONSUMER_CRON_JOB = "0 * * * * ?";
-	public static final String PRODUCER_CRON_JOB = "0 * * * * ?";
+	public static final String CONSUMER_CRON_JOB = "0 0/5 * * * ?";
+	public static final String PRODUCER_CRON_JOB = "0 0/5 * * * ?";
 
-	public static final String STORAGE_CRON_JOB = "3 * * * * ?";
-
-	public static final String NEW_POWER_PLANT_LIMIT_CRON_JOB = "0 * * * * ?";
+	public static final String STORAGE_CRON_JOB = "15 0/5 * * * ?";
 
 }
