@@ -175,7 +175,7 @@ public class StorageLoggerJob implements Job {
 		}
 		long databaseUpdateTime = System.currentTimeMillis() - beforeDatabaseUpdate;
 
-		monitor.setCommercialStoragesCount(measurements.size() + 1);
+		monitor.setCommercialStoragesCount(measurements.size() + measurements.size() > 0 ? 1 : 0);
 		monitor.setCommercialQueryTime(queryTime);
 		monitor.setCommercialDatabaseUpdateTime(databaseUpdateTime);
 
