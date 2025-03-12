@@ -16,6 +16,12 @@ public interface GeneralDeviceService<T extends BaseDevice> {
 	@Transactional
 	void add(T device) throws DuplicateDeviceFoundException;
 
+	@Transactional
+	void systemSave(T device);
+
+	@Transactional(readOnly = true)
+	List<T> getByStartTimeBefore(Instant startTimeBefore);
+
 	@Transactional(readOnly = true)
 	List<T> getAll();
 

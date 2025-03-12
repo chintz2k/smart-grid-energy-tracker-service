@@ -12,6 +12,7 @@ import com.energytracker.webclients.WeatherApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -29,8 +30,8 @@ public class CommercialProducerLoggerJob extends AbstractProducerLoggerJob<Comme
 	}
 
 	@Override
-	protected List<CommercialProducer> getActiveProducers() {
-		return commercialProducerService.getAll();
+	protected List<CommercialProducer> getActiveProducers(Instant startTime) {
+		return commercialProducerService.getByStartTimeBefore(startTime);
 	}
 
 	@Override

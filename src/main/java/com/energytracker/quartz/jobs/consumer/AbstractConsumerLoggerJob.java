@@ -41,7 +41,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	private final StorageHandler storageHandler;
 	private final ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService;
 
-	protected abstract List<T> getActiveConsumers();
+	protected abstract List<T> getActiveConsumers(Instant startTime);
 	protected abstract T getConsumerById(Long id);
 	protected abstract String getMeasurementName();
 	protected abstract void updateAll(List<T> consumerList);
@@ -59,73 +59,60 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	@Async("taskExecutor")
 	public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
 
-		long startTime = System.currentTimeMillis();
+		try {
+			long startTime = System.currentTimeMillis();
 
-		List<T> activeConsumers = getActiveConsumers();
-		long readActiveDevicesTime = System.currentTimeMillis() - startTime;
+			List<T> activeConsumers = getActiveConsumers(Instant.now());
+			long readActiveDevicesTime = System.currentTimeMillis() - startTime;
 
-		List<ConsumptionMeasurement> measurementsBatch = Collections.synchronizedList(new ArrayList<>());
-		List<T> updatedConsumers = Collections.synchronizedList(new ArrayList<>());
-		List<T> removedConsumers = Collections.synchronizedList(new ArrayList<>());
-		Map<Long, List<ConsumptionMeasurement>> ownerConsumptionData = new ConcurrentHashMap<>();
+			List<ConsumptionMeasurement> measurementsBatch = Collections.synchronizedList(new ArrayList<>());
+			List<T> updatedConsumers = Collections.synchronizedList(new ArrayList<>());
+			List<T> removedConsumers = Collections.synchronizedList(new ArrayList<>());
+			Map<Long, List<ConsumptionMeasurement>> ownerConsumptionData = new ConcurrentHashMap<>();
 
-		long beforeProcessMethod = System.currentTimeMillis();
-		processSyncedInBatches(activeConsumers, measurementsBatch, updatedConsumers, removedConsumers, ownerConsumptionData);
-		long processMethodTime = System.currentTimeMillis() - beforeProcessMethod;
+			long beforeProcessMethod = System.currentTimeMillis();
+			processSyncedInBatches(activeConsumers, measurementsBatch, updatedConsumers, removedConsumers, ownerConsumptionData);
+			long processMethodTime = System.currentTimeMillis() - beforeProcessMethod;
 
-		long beforeUpdateStorages = System.currentTimeMillis();
-		Map<Long, Double> totalConsumptionOfOwnerMap = getTotalConsumptionByOwnerAsMap(ownerConsumptionData);
-		int measurementsCount = storageHandler.updateStorages(totalConsumptionOfOwnerMap, true);
-		long updateStoragesTime = System.currentTimeMillis() - beforeUpdateStorages;
+			long beforeUpdateStorages = System.currentTimeMillis();
+			Map<Long, Double> totalConsumptionOfOwnerMap = getTotalConsumptionByOwnerAsMap(ownerConsumptionData);
+			int measurementsCount = storageHandler.updateStorages(totalConsumptionOfOwnerMap, true);
+			long updateStoragesTime = System.currentTimeMillis() - beforeUpdateStorages;
 
-		List<ConsumptionMeasurement> totalConsumptionOfOwnerByTimestamp = calculateTotalConsumptionByOwnerAndTimestamp(ownerConsumptionData);
-		List<ConsumptionMeasurement> totalConsumptionByTimestamp = calculateTotalConsumptionByTimestamp(ownerConsumptionData);
+			List<ConsumptionMeasurement> totalConsumptionOfOwnerByTimestamp = calculateTotalConsumptionByOwnerAndTimestamp(ownerConsumptionData);
+			List<ConsumptionMeasurement> totalConsumptionByTimestamp = calculateTotalConsumptionByTimestamp(ownerConsumptionData);
 
-		measurementsCount = measurementsCount + measurementsBatch.size() + totalConsumptionOfOwnerByTimestamp.size() + totalConsumptionByTimestamp.size();
-		int updatedConsumersCount = updatedConsumers.size();
-		int removedConsumersCount = removedConsumers.size();
-		long cpuIntensiveTime = System.currentTimeMillis() - startTime;
+			measurementsCount = measurementsCount + measurementsBatch.size() + totalConsumptionOfOwnerByTimestamp.size() + totalConsumptionByTimestamp.size();
+			int updatedConsumersCount = updatedConsumers.size();
+			int removedConsumersCount = removedConsumers.size();
+			long cpuIntensiveTime = System.currentTimeMillis() - startTime;
 
-		long beforeUpdateDatabaseTime = System.currentTimeMillis();
-		updateDatabase(updatedConsumers, removedConsumers, measurementsBatch, totalConsumptionOfOwnerByTimestamp, totalConsumptionByTimestamp);
-		long updateDatabaseTime = System.currentTimeMillis() - beforeUpdateDatabaseTime;
-		long overallTime = System.currentTimeMillis() - startTime;
+			long beforeUpdateDatabaseTime = System.currentTimeMillis();
+			updateDatabase(updatedConsumers, removedConsumers, measurementsBatch, totalConsumptionOfOwnerByTimestamp, totalConsumptionByTimestamp);
+			long updateDatabaseTime = System.currentTimeMillis() - beforeUpdateDatabaseTime;
+			long overallTime = System.currentTimeMillis() - startTime;
 
-		if (measurementsCount > 0) {
-			consumerProducerLoggerMonitorService.save(
-					new ConsumerProducerLoggerMonitor(
-							Instant.now(),
-							getClass().getSimpleName(),
-							readActiveDevicesTime,
-							processMethodTime,
-							cpuIntensiveTime,
-							updateStoragesTime,
-							updateDatabaseTime,
-							0L,
-							overallTime,
-							updatedConsumersCount,
-							removedConsumersCount,
-							measurementsCount
-					)
-			);
-		}
-	}
-
-	private void processSynced(
-			List<T> activeConsumers,
-			List<ConsumptionMeasurement> measurementsBatch,
-			List<T> updatedConsumers,
-			List<T> removedConsumers,
-			Map<Long, List<ConsumptionMeasurement>> ownerConsumptionData
-	) {
-		for (T consumer : activeConsumers) {
-			Long id = getDeviceId(consumer);
-			if (id != null) {
-				T latestConsumer = getConsumerById(id);
-				if (latestConsumer != null) {
-					processConsumer(latestConsumer, measurementsBatch, updatedConsumers, removedConsumers, ownerConsumptionData);
-				}
+			if (measurementsCount > 0) {
+				consumerProducerLoggerMonitorService.save(
+						new ConsumerProducerLoggerMonitor(
+								Instant.now(),
+								getClass().getSimpleName(),
+								readActiveDevicesTime,
+								processMethodTime,
+								cpuIntensiveTime,
+								updateStoragesTime,
+								updateDatabaseTime,
+								0L,
+								overallTime,
+								updatedConsumersCount,
+								removedConsumersCount,
+								measurementsCount
+						)
+				);
 			}
+		} catch (Exception e) {
+			logger.error("Fehler in der execute-Methode: {}", e.getMessage());
+			throw new JobExecutionException(e);
 		}
 	}
 

@@ -3,6 +3,7 @@ package com.energytracker.repository.devices;
 import com.energytracker.entity.devices.Consumer;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -11,5 +12,7 @@ import java.util.List;
 public interface ConsumerRepository extends JpaRepository<Consumer, Long> {
 
 	List<Consumer> findDevicesByDeviceId(Long deviceId);
+
+	List<Consumer> findByStartTimeBefore(Instant startTimeBefore);
 
 }

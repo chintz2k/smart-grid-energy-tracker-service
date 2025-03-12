@@ -44,7 +44,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	private final PowerPlantLimitsService powerPlantLimitsService;
 	private final ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService;
 
-	protected abstract List<T> getActiveProducers();
+	protected abstract List<T> getActiveProducers(Instant startTime);
 	protected abstract boolean commercial();
 	protected abstract T getProducerById(Long id);
 	protected abstract String getMeasurementName();
@@ -73,7 +73,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 
 		long startTime = System.currentTimeMillis();
 
-		List<T> activeProducers = getActiveProducers();
+		List<T> activeProducers = getActiveProducers(Instant.now());
 		long readActiveDevicesTime = System.currentTimeMillis() - startTime;
 
 		List<ProductionMeasurement> measurementsBatch = Collections.synchronizedList(new ArrayList<>());

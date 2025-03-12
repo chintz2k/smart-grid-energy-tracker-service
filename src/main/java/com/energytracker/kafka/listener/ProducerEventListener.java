@@ -3,18 +3,27 @@ package com.energytracker.kafka.listener;
 import com.energytracker.entity.devices.CommercialProducer;
 import com.energytracker.entity.devices.Producer;
 import com.energytracker.kafka.events.ProducerEvent;
+import com.energytracker.kafka.events.ProducerSystemEvent;
 import com.energytracker.service.general.GeneralDeviceService;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * @author André Heinen
  */
 @Service
 public class ProducerEventListener {
+
+	private static final Logger logger = LoggerFactory.getLogger(ProducerEventListener.class);
 
 	private final GeneralDeviceService<Producer> producerService;
 	private final GeneralDeviceService<CommercialProducer> commercialProducerService;
@@ -45,6 +54,30 @@ public class ProducerEventListener {
 			} else {
 				producerService.updateEndTime(producerEvent.getDeviceId(), producerEvent.getTimestamp());
 			}
+		}
+	}
+
+	@KafkaListener(topics = "system-managed-private-producer-events", groupId = "energy-tracker-group")
+	public void processProducerEventsFromSystem(@Payload String message) throws JsonProcessingException {
+		try {
+			List<ProducerSystemEvent> events = objectMapper.readValue(message, new TypeReference<>() {
+			});
+
+			for (ProducerSystemEvent event : events) {
+				Producer producer = new Producer();
+				producer.setDeviceId(event.getDeviceId());
+				producer.setOwnerId(event.getOwnerId());
+				producer.setPowerProduction(event.getPowerProduction());
+				producer.setPowerType(event.getPowerType());
+				producer.setRenewable(event.isRenewable());
+				producer.setStartTime(event.getEventStart());
+				producer.setEndTime(event.getEventEnd());
+
+				producerService.systemSave(producer);
+			}
+		} catch (JsonProcessingException e) {
+			logger.error("Error processing Kafka message: {}", message, e);
+			throw e;
 		}
 	}
 }

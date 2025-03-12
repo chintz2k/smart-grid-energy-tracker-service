@@ -10,6 +10,7 @@ import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -27,8 +28,8 @@ public class ConsumerLoggerJob extends AbstractConsumerLoggerJob<Consumer> {
 	}
 
 	@Override
-	protected List<Consumer> getActiveConsumers() {
-		return consumerService.getAll();
+	protected List<Consumer> getActiveConsumers(Instant startTime) {
+		return consumerService.getByStartTimeBefore(startTime);
 	}
 
 	@Override

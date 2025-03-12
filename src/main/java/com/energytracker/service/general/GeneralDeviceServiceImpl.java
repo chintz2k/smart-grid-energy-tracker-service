@@ -33,6 +33,17 @@ public abstract class GeneralDeviceServiceImpl<T extends BaseDevice, R extends J
 	}
 
 	@Override
+	@Transactional
+	public void systemSave(T device) {
+		repository.save(device);
+	}
+
+	@Override
+	@Cacheable("activedevices")
+	@Transactional(readOnly = true)
+	public abstract List<T> getByStartTimeBefore(Instant startTimeBefore);
+
+	@Override
 	@Cacheable("devices")
 	@Transactional(readOnly = true)
 	public List<T> getAll() {
