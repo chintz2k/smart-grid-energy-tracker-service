@@ -1,5 +1,6 @@
 package com.energytracker.influx.service.general;
 
+import com.energytracker.dto.NetBalanceEvent;
 import com.energytracker.influx.measurements.devices.ConsumptionMeasurement;
 import com.energytracker.influx.measurements.devices.ProductionMeasurement;
 import com.energytracker.influx.measurements.devices.StorageMeasurement;
@@ -22,7 +23,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  *
@@ -34,10 +34,10 @@ public class InfluxService {
 	private static final Logger logger = LoggerFactory.getLogger(InfluxService.class);
 
 	private final InfluxDBClient influxDBClient;
-	private final KafkaTemplate<String, String> kafkaTemplate;
+	private final KafkaTemplate<String, Object> kafkaTemplate;
 
 	@Autowired
-	public InfluxService(InfluxDBClient influxDBClient, KafkaTemplate<String, String> kafkaTemplate) {
+	public InfluxService(InfluxDBClient influxDBClient, KafkaTemplate<String, Object> kafkaTemplate) {
 		this.influxDBClient = influxDBClient;
 		this.kafkaTemplate = kafkaTemplate;
 	}
@@ -90,7 +90,9 @@ public class InfluxService {
 		if (measurement == null) {
 			return;
 		}
-		String event = String.format(Locale.ENGLISH, "{\"currentBalance\": %f, \"change\": %f}", measurement.getCurrentBalance(), measurement.getChange());
+		NetBalanceEvent event = new NetBalanceEvent();
+		event.setCurrentBalance(measurement.getCurrentBalance());
+		event.setChange(measurement.getChange());
 		kafkaTemplate.send("net-measurement", event).whenComplete((result, exception) -> {
 			if (exception != null) {
 				logger.error("Fehler beim Senden des Events \"net-measurement\": {}", exception.getMessage());
