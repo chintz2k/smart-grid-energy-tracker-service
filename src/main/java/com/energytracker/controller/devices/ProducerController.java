@@ -4,6 +4,7 @@ import com.energytracker.influx.service.devices.InfluxProducerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,7 +25,7 @@ public class ProducerController {
 		this.producerService = producerService;
 	}
 
-	@RequestMapping("/devices/chart")
+	@GetMapping("/devices/chart")
 	public ResponseEntity<Map<String, Object>> getProducersMeasurementsForChartJs(
 			@RequestParam(required = false) String deviceId,
 			@RequestParam(required = false) String powerType,
@@ -49,7 +50,7 @@ public class ProducerController {
 		return ResponseEntity.ok().body(mapforChartJs);
 	}
 
-	@RequestMapping("/owner/chart")
+	@GetMapping("/owner/chart")
 	public ResponseEntity<Map<String, Object>> getProducersByOwnerMeasurementsForChartJs(
 			@RequestParam(required = false) String ownerId,
 			@RequestParam(required = false) String powerType,
@@ -74,7 +75,7 @@ public class ProducerController {
 		return ResponseEntity.ok().body(mapforChartJs);
 	}
 
-	@RequestMapping("/overall/chart")
+	@GetMapping("/overall/chart")
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
 	public ResponseEntity<Map<String, Object>> getProducersOverallMeasurementsForChartJs(
 			@RequestParam(required = false) String powerType,

@@ -4,6 +4,7 @@ import com.energytracker.influx.service.devices.InfluxConsumerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,7 +25,7 @@ public class ConsumerController {
 		this.consumerService = consumerService;
 	}
 
-	@RequestMapping("/devices/chart")
+	@GetMapping("/devices/chart")
 	public ResponseEntity<Map<String, Object>> getConsumersMeasurementsForChartJs(
 			@RequestParam(required = false) String deviceId,
 			@RequestParam(required = false) String range,
@@ -45,7 +46,7 @@ public class ConsumerController {
 		return ResponseEntity.ok().body(mapforChartJs);
 	}
 
-	@RequestMapping("/owner/chart")
+	@GetMapping("/owner/chart")
 	public ResponseEntity<Map<String, Object>> getConsumersByOwnerMeasurementsForChartJs(
 			@RequestParam(required = false) String ownerId,
 			@RequestParam(required = false) String range,
@@ -66,7 +67,7 @@ public class ConsumerController {
 		return ResponseEntity.ok().body(mapforChartJs);
 	}
 
-	@RequestMapping("/overall/chart")
+	@GetMapping("/overall/chart")
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
 	public ResponseEntity<Map<String, Object>> getConsumersOverallMeasurementsForChartJs(
 			@RequestParam(required = false) String range,
