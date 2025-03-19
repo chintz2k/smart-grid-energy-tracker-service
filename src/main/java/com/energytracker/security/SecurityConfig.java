@@ -57,8 +57,14 @@ public class SecurityConfig {
 	@Bean
 	public CorsConfigurationSource corsConfigurationSource() {
 		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.addAllowedOrigin("http://localhost:8080"); // Ihre Vue.js App URL
-		configuration.addAllowedOrigin("http://localhost:5173"); // Ihre Vue.js App URL
+		configuration.addAllowedOrigin("http://localhost:8080");
+		configuration.addAllowedOrigin("http://localhost:5173");
+		configuration.addAllowedOrigin("http://www.chintz.dev");
+		configuration.addAllowedOrigin("http://chintz.dev");
+		configuration.addAllowedOrigin("https://www.chintz.dev");
+		configuration.addAllowedOrigin("https://chintz.dev");
+		configuration.addAllowedOrigin("http://85.215.59.153");
+		configuration.addAllowedOrigin("https://85.215.59.153");
 		configuration.addAllowedMethod("*");
 		configuration.addAllowedHeader("*");
 

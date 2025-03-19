@@ -1,6 +1,5 @@
 package com.energytracker.influx.util;
 
-import com.energytracker.security.SecurityService;
 import com.influxdb.client.InfluxDBClient;
 import com.influxdb.query.FluxRecord;
 import com.influxdb.query.FluxTable;
@@ -20,12 +19,10 @@ public class ChartJsHelper {
 
 	private final InfluxDBClient influxDBClient;
 	private final ChartColorPicker chartColorPicker;
-	private final SecurityService securityService;
 
-	public ChartJsHelper(InfluxDBClient influxDBClient, ChartColorPicker chartColorPicker, SecurityService securityService) {
+	public ChartJsHelper(InfluxDBClient influxDBClient, ChartColorPicker chartColorPicker) {
 		this.influxDBClient = influxDBClient;
 		this.chartColorPicker = chartColorPicker;
-		this.securityService = securityService;
 	}
 
 	public Map<String, Object> createMapForChartJsFromQuery(String query, boolean fill) {
@@ -36,49 +33,34 @@ public class ChartJsHelper {
 			List<FluxTable> tables = influxDBClient.getQueryApi().query(query);
 
 			List<String> labels = new ArrayList<>(); // Labels für Zeitstempel
-			List<Map<String, Object>> datasets = new ArrayList<>(); // Datenstruktur für die DataSets
-
-//			System.out.println(tables.size() + " Tabellen gefunden");
+			List<Map<String, Object>> datasets = new ArrayList<>(); // Datenstruktur für die eigentlichen Daten
 
 			for (FluxTable table : tables) {
-//				System.out.println(table.getRecords().getFirst().getValues());
-				// Jede Tabelle entspricht einem Gerät
-				String deviceId = table.getRecords().isEmpty() ? "" : (String) table.getRecords().getFirst().getValueByKey("deviceId");
-				String ownerId = table.getRecords().isEmpty() ? "" : (String) table.getRecords().getFirst().getValueByKey("ownerId");
-//				String powerType = table.getRecords().isEmpty() ? "" : (String) table.getRecords().getFirst().getValueByKey("powerType");
-				boolean currentBalance = !table.getRecords().isEmpty() && table.getRecords().getFirst().getValues().toString().contains("currentBalance");
-				boolean change = !table.getRecords().isEmpty() && table.getRecords().getFirst().getValues().toString().contains("change");
+				// Jede Tabelle entspricht einem field
 				String outputString = "";
-				if (deviceId == null || deviceId.isBlank()) { // Alle Geräte
-					outputString += "";
-				} else {
-					outputString += "Gerät: " + deviceId;
-				}
-//				if (powerType == null) {
-//					outputString += "";
-//				} else {
-//					outputString += getCleanPowerString(powerType);
-//				}
-				if (ownerId == null || ownerId.isBlank()) {
-					outputString += "";
-				} else {
-					if (securityService.getCurrentUserRole().equals("ROLE_ADMIN") || securityService.getCurrentUserRole().equals("ROLE_SYSTEM")) {
-						outputString += " - Besitzer: " + ownerId;
-					}
-				}
-				if (currentBalance || change) {
-					outputString = "";
-				}
-				if (!outputString.isBlank()) {
-					outputString += " - ";
-				}
-
 				if (!table.getRecords().isEmpty()) {
-					if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_TOTAL)) {
+					if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_TOTAL)
+							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_OWNER)) {
 						outputString = "Verbrauch";
-					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL)) {
+					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL)
+							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER)) {
 						String powerType = Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("powerType")).toString();
 						outputString = getCleanPowerString(powerType);
+					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_TOTAL)
+							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_COMMERCIAL)
+							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_PRIVATE)
+							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_OWNER)) {
+						if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("capacity")) {
+							outputString = "Kapazität";
+						} else if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("currentCharge")) {
+							outputString = "Aktuelle Ladung";
+						}
+					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_NET)) {
+						if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("currentBalance")) {
+							outputString = "Aktuelle Netzlast";
+						} else if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("change")) {
+							outputString = "Letzte Änderung";
+						}
 					}
 				}
 
@@ -87,23 +69,21 @@ public class ChartJsHelper {
 				for (FluxRecord record : table.getRecords()) {
 					String time = Objects.requireNonNull(record.getTime()).toString();
 					if (!labels.contains(time)) {
-						labels.add(time); // Eindeutige Zeitstempel hinzufügen
+						labels.add(time);
 					}
-
-					// Die Felder des Geräts identifizieren
 					String field = (String) record.getValueByKey("_field");
 					fieldValuesMap.putIfAbsent(field, new ArrayList<>());
 					fieldValuesMap.get(field).add(record.getValueByKey("_value"));
 				}
 
-				// Für jedes Feld im Gerät eine eigene Serie (Kurve) hinzufügen
+				// Für jedes Feld im Gerät eine eigene Kurve hinzufügen
 				for (Map.Entry<String, List<Object>> fieldEntry : fieldValuesMap.entrySet()) {
 					Map<String, Object> dataset = new HashMap<>();
-					dataset.put("label", outputString); // Kombiniertes Label aus Gerät und Feld
-					dataset.put("data", fieldEntry.getValue()); // Werte für das Feld
-					dataset.put("borderColor", chartColorPicker.generateColor(datasets.size(), tables.size() * fieldValuesMap.size(), 1.0)); // Linienfarbe
-					dataset.put("backgroundColor", chartColorPicker.generateColor(datasets.size(), tables.size() * fieldValuesMap.size(), 0.2)); // Hintergrundfarbe
-					dataset.put("fill", fill); // Keine Füllung unter der Linie
+					dataset.put("label", outputString);
+					dataset.put("data", fieldEntry.getValue());
+					dataset.put("borderColor", chartColorPicker.generateColor(datasets.size(), tables.size() * fieldValuesMap.size(), 1.0));
+					dataset.put("backgroundColor", chartColorPicker.generateColor(datasets.size(), tables.size() * fieldValuesMap.size(), 0.2));
+					dataset.put("fill", fill);
 					datasets.add(dataset);
 				}
 			}
