@@ -40,20 +40,16 @@ public class ChartJsHelper {
 				String outputString = "";
 				if (!table.getRecords().isEmpty()) {
 					if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_TOTAL)
-							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_OWNER)
-							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_DEVICE)) {
+							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_OWNER)) {
 						outputString = "Verbrauch";
 					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL)
-							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER)
-							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_DEVICE)) {
+							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER)) {
 						String powerType = Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("powerType")).toString();
 						outputString = getCleanPowerString(powerType);
 					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_TOTAL)
 							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_COMMERCIAL)
 							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_PRIVATE)
-							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_OWNER)
-							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL)
-							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE)) {
+							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_OWNER)) {
 						if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("capacity")) {
 							outputString = "Kapazität";
 						} else if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("currentCharge")) {
@@ -65,6 +61,13 @@ public class ChartJsHelper {
 						} else if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("change")) {
 							outputString = "Letzte Änderung";
 						}
+					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_DEVICE)) {
+						outputString = "Gerät: " + Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("deviceId"));
+					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_DEVICE)) {
+						outputString = "Gerät: " + Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("deviceId"));
+					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL)
+							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE)) {
+						outputString = "Gerät: " + Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("deviceId"));
 					}
 				}
 
