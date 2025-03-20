@@ -53,7 +53,7 @@ public class ChartJsHelper {
 						if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("capacity")) {
 							outputString = "Kapazität";
 						} else if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("currentCharge")) {
-							outputString = "Aktuelle Ladung";
+							outputString = "Ladung";
 						}
 					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_NET)) {
 						if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("currentBalance")) {
@@ -64,10 +64,15 @@ public class ChartJsHelper {
 					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_DEVICE)) {
 						outputString = "Gerät: " + Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("deviceId"));
 					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_DEVICE)) {
-						outputString = "Gerät: " + Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("deviceId"));
+						String powerType = Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("powerType")).toString();
+						outputString = "Gerät: " + Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("deviceId")) + " / " + getCleanPowerString(powerType);
 					} else if (Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL)
 							|| Objects.requireNonNull(table.getRecords().getFirst().getMeasurement()).equalsIgnoreCase(InfluxConstants.MEASUREMENT_NAME_STORAGE)) {
-						outputString = "Gerät: " + Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("deviceId"));
+						if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("capacity")) {
+							outputString = "Kapazität von " + Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("deviceId"));
+						} else if (Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("_field")).toString().equalsIgnoreCase("currentCharge")) {
+							outputString = "Ladung von " + Objects.requireNonNull(table.getRecords().getFirst().getValueByKey("deviceId"));
+						}
 					}
 				}
 
