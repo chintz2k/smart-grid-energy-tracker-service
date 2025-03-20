@@ -38,7 +38,13 @@ public class InfluxConsumerService {
 	) {
 		Long ownerId = securityService.getCurrentUserId();
 
-		List<Long> deviceIds = securityService.getDevicesThatBelongToUserFromStringOrIsAdminOrIsSystem(deviceId);
+		List<Long> deviceIds;
+		if (deviceId == null || deviceId.isBlank()) {
+			deviceIds = securityService.getDevicesThatBelongToUserFromStringOrIsAdminOrIsSystem(deviceId);
+		} else {
+			deviceIds = new ArrayList<>();
+			deviceIds.add(Long.valueOf(deviceId));
+		}
 
 		List<Long> ownerIds = new ArrayList<>();
 		if (!securityService.getCurrentUserRole().equals("ROLE_ADMIN") && !securityService.getCurrentUserRole().equals("ROLE_SYSTEM")) {
