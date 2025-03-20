@@ -44,10 +44,27 @@ public class DeviceController {
 		return ResponseEntity.ok().body(mapforChartJs);
 	}
 
-	@GetMapping("/consumptioncard")
-	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
-	public ResponseEntity<Map<String, Double>> getConsumptionCard() {
-		Map<String, Double> map = deviceService.getCurrentAndAverage(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_TOTAL);
+	@GetMapping("/private/chart")
+	public ResponseEntity<Map<String, Object>> getPrivateOverallMeasurementsForChartJs(
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType
+	) {
+		Map<String, Object> mapforChartJs = deviceService.getPrivateOverallMeasurementsForChartJs(
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType
+		);
+		return ResponseEntity.ok().body(mapforChartJs);
+	}
+
+	@GetMapping("/private/consumptioncard")
+	public ResponseEntity<Map<String, Double>> getConsumptionCardPrivate() {
+		Map<String, Double> map = deviceService.getCurrentAndAveragePrivate(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_OWNER);
 		return ResponseEntity.ok().body(map);
 	}
 
@@ -58,10 +75,16 @@ public class DeviceController {
 		return ResponseEntity.ok().body(map);
 	}
 
-	@GetMapping("/productioncard")
+	@GetMapping("/consumptioncard")
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
-	public ResponseEntity<Map<String, Double>> getProductionCard() {
-		Map<String, Double> map = deviceService.getCurrentAndAverage(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
+	public ResponseEntity<Map<String, Double>> getConsumptionCard() {
+		Map<String, Double> map = deviceService.getCurrentAndAverage(InfluxConstants.MEASUREMENT_NAME_CONSUMPTION_TOTAL);
+		return ResponseEntity.ok().body(map);
+	}
+
+	@GetMapping("/private/productioncard")
+	public ResponseEntity<Map<String, Double>> getProductionCardPrivate() {
+		Map<String, Double> map = deviceService.getCurrentAndAveragePrivate(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_OWNER);
 		return ResponseEntity.ok().body(map);
 	}
 
@@ -72,10 +95,16 @@ public class DeviceController {
 		return ResponseEntity.ok().body(map);
 	}
 
-	@GetMapping("/storagecard")
+	@GetMapping("/productioncard")
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
-	public ResponseEntity<Map<String, Double>> getStorageCard() {
-		Map<String, Double> map = deviceService.getCurrentStorageData(null);
+	public ResponseEntity<Map<String, Double>> getProductionCard() {
+		Map<String, Double> map = deviceService.getCurrentAndAverage(InfluxConstants.MEASUREMENT_NAME_PRODUCTION_TOTAL);
+		return ResponseEntity.ok().body(map);
+	}
+
+	@GetMapping("/private/storagecard")
+	public ResponseEntity<Map<String, Double>> getStorageCardPrivate() {
+		Map<String, Double> map = deviceService.getCurrentStorageDataPrivate();
 		return ResponseEntity.ok().body(map);
 	}
 
@@ -83,6 +112,13 @@ public class DeviceController {
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
 	public ResponseEntity<Map<String, Double>> getStorageCardByOwner(@PathVariable Long userId) {
 		Map<String, Double> map = deviceService.getCurrentStorageData(userId);
+		return ResponseEntity.ok().body(map);
+	}
+
+	@GetMapping("/storagecard")
+	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
+	public ResponseEntity<Map<String, Double>> getStorageCard() {
+		Map<String, Double> map = deviceService.getCurrentStorageData(null);
 		return ResponseEntity.ok().body(map);
 	}
 }
