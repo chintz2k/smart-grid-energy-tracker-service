@@ -33,7 +33,8 @@ public class StorageController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = storageService.getStoragesMeasurementsForChartJs(
 				deviceId,
@@ -42,7 +43,8 @@ public class StorageController {
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return ResponseEntity.ok().body(mapforChartJs);
@@ -56,7 +58,8 @@ public class StorageController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = storageService.getStoragesByOwnerMeasurementsForChartJs(
 				ownerId,
@@ -65,7 +68,8 @@ public class StorageController {
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return ResponseEntity.ok().body(mapforChartJs);
@@ -80,7 +84,8 @@ public class StorageController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = storageService.getStoragesOverallMeasurementsForChartJs(
 				status,
@@ -89,7 +94,8 @@ public class StorageController {
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return ResponseEntity.ok().body(mapforChartJs);

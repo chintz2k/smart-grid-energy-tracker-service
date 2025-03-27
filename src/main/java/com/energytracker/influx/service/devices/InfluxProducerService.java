@@ -39,7 +39,8 @@ public class InfluxProducerService {
 			String start,
 			String end,
 			String aggregateWindowTime,
-			String aggregateWindowType
+			String aggregateWindowType,
+			boolean fillMissingValues
 	) {
 		Long ownerId = securityService.getCurrentUserId();
 
@@ -70,7 +71,8 @@ public class InfluxProducerService {
 				deviceIds,
 				filterMap,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
@@ -84,7 +86,8 @@ public class InfluxProducerService {
 			String start,
 			String end,
 			String aggregateWindowTime,
-			String aggregateWindowType
+			String aggregateWindowType,
+			boolean fillMissingValues
 	) {
 		List<Long> ownerIds = new ArrayList<>();
 		if (ownerId != null) {
@@ -118,7 +121,8 @@ public class InfluxProducerService {
 				null,
 				filterMap,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
@@ -131,7 +135,8 @@ public class InfluxProducerService {
 			String start,
 			String end,
 			String aggregateWindowTime,
-			String aggregateWindowType
+			String aggregateWindowType,
+			boolean fillMissingValues
 	) {
 		securityService.checkIfUserIsAdminOrIsSystem();
 
@@ -150,7 +155,8 @@ public class InfluxProducerService {
 				null,
 				filterMap,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);

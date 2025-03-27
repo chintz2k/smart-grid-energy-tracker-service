@@ -34,7 +34,8 @@ public class InfluxDeviceService {
 			String start,
 			String end,
 			String aggregateWindowTime,
-			String aggregateWindowType
+			String aggregateWindowType,
+			boolean fillMissingValues
 	) {
 		String query;
 		if (userId != null) {
@@ -51,7 +52,8 @@ public class InfluxDeviceService {
 					null,
 					null,
 					aggregateWindowTime,
-					aggregateWindowType
+					aggregateWindowType,
+					fillMissingValues
 			);
 		} else {
 			query = influxQueryHelper.createInfluxQuery(
@@ -67,7 +69,8 @@ public class InfluxDeviceService {
 					null,
 					null,
 					aggregateWindowTime,
-					aggregateWindowType
+					aggregateWindowType,
+					fillMissingValues
 			);
 		}
 		return chartJsHelper.createMapForChartJsFromQuery(query, true);
@@ -78,7 +81,8 @@ public class InfluxDeviceService {
 			String start,
 			String end,
 			String aggregateWindowTime,
-			String aggregateWindowType
+			String aggregateWindowType,
+			boolean fillMissingValues
 	) {
 		Long userId = securityService.getCurrentUserId();
 		String query;
@@ -95,7 +99,8 @@ public class InfluxDeviceService {
 				null,
 				null,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 		return chartJsHelper.createMapForChartJsFromQuery(query, true);
 	}

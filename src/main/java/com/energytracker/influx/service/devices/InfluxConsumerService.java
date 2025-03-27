@@ -34,7 +34,8 @@ public class InfluxConsumerService {
 			String start,
 			String end,
 			String aggregateWindowTime,
-			String aggregateWindowType
+			String aggregateWindowType,
+			boolean fillMissingValues
 	) {
 		Long ownerId = securityService.getCurrentUserId();
 
@@ -61,7 +62,8 @@ public class InfluxConsumerService {
 				deviceIds,
 				null,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
@@ -73,7 +75,8 @@ public class InfluxConsumerService {
 			String start,
 			String end,
 			String aggregateWindowTime,
-			String aggregateWindowType
+			String aggregateWindowType,
+			boolean fillMissingValues
 	) {
 		List<Long> ownerIds = new ArrayList<>();
 		if (ownerId != null) {
@@ -103,7 +106,8 @@ public class InfluxConsumerService {
 				null,
 				null,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
@@ -114,7 +118,8 @@ public class InfluxConsumerService {
 			String start,
 			String end,
 			String aggregateWindowTime,
-			String aggregateWindowType
+			String aggregateWindowType,
+			boolean fillMissingValues
 	) {
 		securityService.checkIfUserIsAdminOrIsSystem();
 
@@ -128,7 +133,8 @@ public class InfluxConsumerService {
 				null,
 				null,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);

@@ -35,7 +35,8 @@ public class InfluxQueryHelper {
 			List<Long> devices,
 			Map<String, String> filters,
 			String aggregateWindowTime,
-			String aggregateWindowType
+			String aggregateWindowType,
+			boolean fillMissingValues
 	) {
 		return "from(bucket: \"" + bucket + "\") " +
 				addRange(range, start, end) +
@@ -43,7 +44,7 @@ public class InfluxQueryHelper {
 				addOwners(owners) +
 				addDevices(devices) +
 				addFilters(filters) +
-				addAggregateWindow(aggregateWindowTime, aggregateWindowType) +
+				addAggregateWindow(aggregateWindowTime, aggregateWindowType, fillMissingValues) +
 				"|> yield(name: \"mean\")";
 	}
 
@@ -173,13 +174,13 @@ public class InfluxQueryHelper {
 		}
 	}
 
-	private String addAggregateWindow(String aggregateWindowTime, String aggregateWindowType) {
+	private String addAggregateWindow(String aggregateWindowTime, String aggregateWindowType, boolean fillMissingValues) {
 		if (aggregateWindowTime == null || aggregateWindowTime.isBlank()) {
 			return "";
 		} else {
 			aggregateWindowTime = ensureInfluxTimeUnit(aggregateWindowTime, "s");
 			aggregateWindowType = ensureInfluxAggregationType(aggregateWindowType);
-			return "|> aggregateWindow(every: " + aggregateWindowTime + ", fn: " + aggregateWindowType + ") ";
+			return "|> aggregateWindow(every: " + aggregateWindowTime + ", fn: " + aggregateWindowType + ", createEmpty: " + fillMissingValues + ") ";
 		}
 	}
 

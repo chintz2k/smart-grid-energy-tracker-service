@@ -34,7 +34,8 @@ public class ProducerController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = producerService.getProducersMeasurementsForChartJs(
 				deviceId,
@@ -44,7 +45,8 @@ public class ProducerController {
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return ResponseEntity.ok().body(mapforChartJs);
@@ -59,7 +61,8 @@ public class ProducerController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = producerService.getProducersByOwnerMeasurementsForChartJs(
 				ownerId,
@@ -69,7 +72,8 @@ public class ProducerController {
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return ResponseEntity.ok().body(mapforChartJs);
@@ -84,7 +88,8 @@ public class ProducerController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = producerService.getProducersOverallMeasurementsForChartJs(
 				powerType,
@@ -93,7 +98,8 @@ public class ProducerController {
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return ResponseEntity.ok().body(mapforChartJs);

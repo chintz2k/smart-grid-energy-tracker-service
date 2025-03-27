@@ -39,14 +39,16 @@ public class PowerPlantLimitsController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapForChartJs = powerPlantLimitsService.getPowerPlantLimitsMeasurementsForChartJs(
 				range,
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return ResponseEntity.ok().body(mapForChartJs);

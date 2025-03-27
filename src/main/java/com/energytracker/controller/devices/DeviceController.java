@@ -31,7 +31,8 @@ public class DeviceController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = deviceService.getDevicesOverallMeasurementsForChartJs(
 				userId,
@@ -39,7 +40,8 @@ public class DeviceController {
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 		return ResponseEntity.ok().body(mapforChartJs);
 	}
@@ -50,14 +52,16 @@ public class DeviceController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = deviceService.getPrivateOverallMeasurementsForChartJs(
 				range,
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 		return ResponseEntity.ok().body(mapforChartJs);
 	}

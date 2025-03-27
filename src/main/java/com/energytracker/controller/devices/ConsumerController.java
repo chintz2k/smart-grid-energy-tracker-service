@@ -32,7 +32,8 @@ public class ConsumerController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = consumerService.getConsumersMeasurementsForChartJs(
 				deviceId,
@@ -40,7 +41,8 @@ public class ConsumerController {
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return ResponseEntity.ok().body(mapforChartJs);
@@ -53,7 +55,8 @@ public class ConsumerController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = consumerService.getConsumersByOwnerMeasurementsForChartJs(
 				ownerId,
@@ -61,7 +64,8 @@ public class ConsumerController {
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return ResponseEntity.ok().body(mapforChartJs);
@@ -74,14 +78,16 @@ public class ConsumerController {
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
 			@RequestParam(required = false) String aggregateWindowTime,
-			@RequestParam(required = false) String aggregateWindowType
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
 	) {
 		Map<String, Object> mapforChartJs = consumerService.getConsumersOverallMeasurementsForChartJs(
 				range,
 				start,
 				end,
 				aggregateWindowTime,
-				aggregateWindowType
+				aggregateWindowType,
+				fillMissingValues
 		);
 
 		return ResponseEntity.ok().body(mapforChartJs);
