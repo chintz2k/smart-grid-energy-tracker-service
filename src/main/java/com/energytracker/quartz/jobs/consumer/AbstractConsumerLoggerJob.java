@@ -177,13 +177,20 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	) {
 		try {
 			// Initialisierung der Start- und Endzeiten der Messung
-			Instant startTime = initializeStartTime(consumer);
-			Instant endTime = calculateEndTime(consumer);
+			Instant startTime = consumer.getLastUpdate() == null ? consumer.getStartTime() : consumer.getLastUpdate().plusSeconds(getIntervalInSeconds());
+			Instant currentTime = Instant.now();
+			Instant endTime = currentTime.minusSeconds(currentTime.getEpochSecond() % getIntervalInSeconds()).truncatedTo(ChronoUnit.SECONDS);
 
 			// Prüfen, ob das Gerät gerade erst gestartet wurde
 			boolean justStarted = consumer.getLastUpdate() == null;
 			// Prüfen, ob das Gerät schon beendet werden kann
-			boolean canFinish = consumer.getEndTime() != null;
+			boolean canFinish = false;
+			if (consumer.getEndTime() != null) {
+				if (consumer.getEndTime().isBefore(endTime)) {
+					canFinish = true;
+					endTime = consumer.getEndTime();
+				}
+			}
 
 			Instant prev = consumer.getLastUpdate() == null ? consumer.getStartTime() : consumer.getLastUpdate();
 			Instant intervalStart = processStartPeriod(consumer, justStarted, startTime, measurementsBatch);
@@ -210,22 +217,6 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			// Fehlerbehandlung mit detaillierter Ausgabe
 			logger.error("Fehler in der processConsumer-Methode für {}: {}", consumer.getClass().getSimpleName(), e.getMessage());
 		}
-	}
-
-	private Instant initializeStartTime(T consumer) {
-		if (consumer.getLastUpdate() == null) {
-			return consumer.getStartTime();
-		}
-		return consumer.getLastUpdate().plusSeconds(getIntervalInSeconds());
-	}
-
-	private Instant calculateEndTime(T consumer) {
-		if (consumer.getEndTime() == null) {
-			Instant currentTime = Instant.now();
-			return currentTime.minusSeconds(currentTime.getEpochSecond() % getIntervalInSeconds())
-					.truncatedTo(ChronoUnit.SECONDS);
-		}
-		return consumer.getEndTime();
 	}
 
 	private Instant processStartPeriod(
