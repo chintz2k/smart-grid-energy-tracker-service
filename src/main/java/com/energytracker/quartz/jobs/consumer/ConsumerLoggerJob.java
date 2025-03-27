@@ -7,6 +7,7 @@ import com.energytracker.quartz.util.QuartzIntervals;
 import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.service.general.GeneralDeviceService;
 import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService;
+import com.energytracker.webclients.DeviceApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -22,8 +23,8 @@ public class ConsumerLoggerJob extends AbstractConsumerLoggerJob<Consumer> {
 	private final GeneralDeviceService<Consumer> consumerService;
 
 	@Autowired
-	public ConsumerLoggerJob(InfluxService influxService, StorageHandler storageHandler, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, GeneralDeviceService<Consumer> consumerService) {
-		super(influxService, storageHandler, consumerProducerLoggerMonitorService);
+	public ConsumerLoggerJob(InfluxService influxService, StorageHandler storageHandler, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, DeviceApiClient deviceApiClient, GeneralDeviceService<Consumer> consumerService) {
+		super(influxService, storageHandler, consumerProducerLoggerMonitorService, deviceApiClient);
 		this.consumerService = consumerService;
 	}
 

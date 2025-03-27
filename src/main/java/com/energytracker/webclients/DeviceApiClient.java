@@ -1,14 +1,13 @@
 package com.energytracker.webclients;
 
-import com.energytracker.dto.WeatherResponse;
 import com.energytracker.security.TokenService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.*;
 
@@ -16,37 +15,36 @@ import org.springframework.web.client.*;
  * @author André Heinen
  */
 @Service
-public class WeatherApiClient {
+public class DeviceApiClient {
 
-	private static final Logger logger = LoggerFactory.getLogger(WeatherApiClient.class);
+	private static final Logger logger = LoggerFactory.getLogger(DeviceApiClient.class);
 
 	private final RestTemplate restTemplate;
 	private final TokenService tokenService;
 
-	public WeatherApiClient(@Qualifier("loadBalancedRestTemplate") RestTemplate restTemplate, TokenService tokenService) {
+	public DeviceApiClient(@Qualifier("loadBalancedRestTemplate") RestTemplate restTemplate, TokenService tokenService) {
 		this.restTemplate = restTemplate;
 		this.tokenService = tokenService;
 	}
 
-	public WeatherResponse getWeather() {
-		String url = "http://weather-api/weather";
+	public void toggleDevice(Long deviceId, boolean active) {
+		String url = "http://home-builder-service/api/devices/" + deviceId + "/toggleNoSendEvent?active=" + active;
 		String accessToken = tokenService.getAccessToken();
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setBearerAuth(accessToken);
+		headers.set("Content-Type", "application/json");
 
 		HttpEntity<?> entity = new HttpEntity<>(headers);
 
 		try {
-			ResponseEntity<WeatherResponse> response = restTemplate.exchange(
+			restTemplate.exchange(
 					url,
-					HttpMethod.GET,
+					HttpMethod.PUT,
 					entity,
-					WeatherResponse.class
+					new ParameterizedTypeReference<>() {}
+
 			);
-
-			return response.getBody();
-
 		} catch (HttpClientErrorException e) {
 			logger.error("Client-Fehler: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
 		} catch (HttpServerErrorException e) {
@@ -58,6 +56,5 @@ public class WeatherApiClient {
 		} catch (Exception e) {
 			logger.error("Ein unerwarteter Fehler ist aufgetreten: {}", e.getMessage());
 		}
-		return null;
 	}
 }

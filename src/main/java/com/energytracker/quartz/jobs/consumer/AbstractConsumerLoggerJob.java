@@ -9,6 +9,7 @@ import com.energytracker.influx.service.general.InfluxService;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService;
+import com.energytracker.webclients.DeviceApiClient;
 import org.jetbrains.annotations.Nullable;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -40,6 +41,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	private final InfluxService influxService;
 	private final StorageHandler storageHandler;
 	private final ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService;
+	private final DeviceApiClient deviceApiClient;
 
 	protected abstract List<T> getActiveConsumers(Instant startTime);
 	protected abstract T getConsumerById(Long id);
@@ -49,10 +51,11 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	protected abstract int getIntervalInSeconds();
 
 	@Autowired
-	public AbstractConsumerLoggerJob(InfluxService influxService, StorageHandler storageHandler, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService) {
+	public AbstractConsumerLoggerJob(InfluxService influxService, StorageHandler storageHandler, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, DeviceApiClient deviceApiClient) {
 		this.influxService = influxService;
 		this.storageHandler = storageHandler;
 		this.consumerProducerLoggerMonitorService = consumerProducerLoggerMonitorService;
+		this.deviceApiClient = deviceApiClient;
 	}
 
 	@Override
@@ -164,6 +167,9 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		}
 
 		if (!removedConsumers.isEmpty()) {
+			for (T consumer : removedConsumers) {
+				deviceApiClient.toggleDevice(consumer.getDeviceId(), false);
+			}
 			removeAll(removedConsumers);
 		}
 	}
@@ -186,7 +192,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			// Prüfen, ob das Gerät schon beendet werden kann
 			boolean canFinish = false;
 			if (consumer.getEndTime() != null) {
-				if (consumer.getEndTime().isBefore(endTime)) {
+				if (!consumer.getEndTime().isAfter(endTime)) {
 					canFinish = true;
 					endTime = consumer.getEndTime();
 				}
@@ -229,6 +235,8 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			// Verbrauch initialisieren, wenn das Gerät gerade eingeschaltet wurde
 			ConsumptionMeasurement zeroMeasurement = createZeroMeasurementAtStart(consumer);
 			measurementsBatch.add(zeroMeasurement);
+
+			deviceApiClient.toggleDevice(consumer.getDeviceId(), true);
 
 			Instant alignedStart = startTime.minusSeconds(startTime.getEpochSecond() % getIntervalInSeconds())
 					.truncatedTo(ChronoUnit.SECONDS)

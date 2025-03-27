@@ -11,6 +11,7 @@ import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService;
 import com.energytracker.service.net.PowerPlantLimitsService;
+import com.energytracker.webclients.DeviceApiClient;
 import com.energytracker.webclients.WeatherApiClient;
 import org.jetbrains.annotations.Nullable;
 import org.quartz.Job;
@@ -43,6 +44,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	private final StorageHandler storageHandler;
 	private final PowerPlantLimitsService powerPlantLimitsService;
 	private final ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService;
+	private final DeviceApiClient deviceApiClient;
 
 	protected abstract List<T> getActiveProducers(Instant startTime);
 	protected abstract boolean commercial();
@@ -59,12 +61,13 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	private double biomassPowerModificator = 1.0;
 
 	@Autowired
-	public AbstractProducerLoggerJob(InfluxService influxService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, PowerPlantLimitsService powerPlantLimitsService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService) {
+	public AbstractProducerLoggerJob(InfluxService influxService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, PowerPlantLimitsService powerPlantLimitsService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, DeviceApiClient deviceApiClient) {
 		this.influxService = influxService;
 		this.weatherApiClient = weatherApiClient;
 		this.storageHandler = storageHandler;
 		this.powerPlantLimitsService = powerPlantLimitsService;
 		this.consumerProducerLoggerMonitorService = consumerProducerLoggerMonitorService;
+		this.deviceApiClient = deviceApiClient;
 	}
 
 	@Override
@@ -214,6 +217,9 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		}
 
 		if (!removedProducers.isEmpty()) {
+			for (T producer : removedProducers) {
+				deviceApiClient.toggleDevice(producer.getDeviceId(), false);
+			}
 			removeAll(removedProducers);
 		}
 	}
@@ -236,7 +242,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			// Prüfen, ob das Gerät schon beendet werden kann
 			boolean canFinish = false;
 			if (producer.getEndTime() != null) {
-				if (producer.getEndTime().isBefore(endTime)) {
+				if (!producer.getEndTime().isAfter(endTime)) {
 					canFinish = true;
 					endTime = producer.getEndTime();
 				}
@@ -279,6 +285,8 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			// Verbrauch initialisieren, wenn das Gerät gerade eingeschaltet wurde
 			ProductionMeasurement zeroMeasurement = createZeroMeasurementAtStart(producer);
 			measurementsBatch.add(zeroMeasurement);
+
+			deviceApiClient.toggleDevice(producer.getDeviceId(), true);
 
 			return startTime.minusSeconds(startTime.getEpochSecond() % getIntervalInSeconds())
 					.truncatedTo(ChronoUnit.SECONDS)

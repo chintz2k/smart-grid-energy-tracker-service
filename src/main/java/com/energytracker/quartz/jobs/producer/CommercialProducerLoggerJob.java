@@ -8,6 +8,7 @@ import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.service.general.GeneralDeviceService;
 import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService;
 import com.energytracker.service.net.PowerPlantLimitsService;
+import com.energytracker.webclients.DeviceApiClient;
 import com.energytracker.webclients.WeatherApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -24,8 +25,8 @@ public class CommercialProducerLoggerJob extends AbstractProducerLoggerJob<Comme
 	private final GeneralDeviceService<CommercialProducer> commercialProducerService;
 
 	@Autowired
-	public CommercialProducerLoggerJob(InfluxService influxService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, PowerPlantLimitsService powerPlantLimitsService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, GeneralDeviceService<CommercialProducer> commercialProducerService) {
-		super(influxService, weatherApiClient, storageHandler, powerPlantLimitsService, consumerProducerLoggerMonitorService);
+	public CommercialProducerLoggerJob(InfluxService influxService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, PowerPlantLimitsService powerPlantLimitsService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, DeviceApiClient deviceApiClient, GeneralDeviceService<CommercialProducer> commercialProducerService) {
+		super(influxService, weatherApiClient, storageHandler, powerPlantLimitsService, consumerProducerLoggerMonitorService, deviceApiClient);
 		this.commercialProducerService = commercialProducerService;
 	}
 

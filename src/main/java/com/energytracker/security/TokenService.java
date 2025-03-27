@@ -43,7 +43,7 @@ public class TokenService {
 		AuthenticationRequest request = new AuthenticationRequest("john@example.com", "12345");
 
 		AuthenticationResponse response = restTemplate.postForObject(
-				"http://registry-service/login", // Service-Name des Authentifizierungsservices
+				"http://registry-service/login",
 				request,
 				AuthenticationResponse.class
 		);
@@ -60,7 +60,7 @@ public class TokenService {
 		TokenRequest request = new TokenRequest(this.refreshToken);
 
 		AuthenticationResponse response = restTemplate.postForObject(
-				"http://registry-service/refresh", // Auch hier Service-Name
+				"http://registry-service/refresh",
 				request,
 				AuthenticationResponse.class
 		);
@@ -81,7 +81,7 @@ public class TokenService {
 
 			return bufferDate.before(new Date());
 		} catch (Exception e) {
-			return true; // Wenn ein Fehler auftritt, betrachte das Token als abgelaufen
+			return true;
 		}
 	}
 

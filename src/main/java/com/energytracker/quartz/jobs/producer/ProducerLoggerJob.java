@@ -8,6 +8,7 @@ import com.energytracker.quartz.util.StorageHandler;
 import com.energytracker.service.general.GeneralDeviceService;
 import com.energytracker.service.monitoring.ConsumerProducerLoggerMonitorService;
 import com.energytracker.service.net.PowerPlantLimitsService;
+import com.energytracker.webclients.DeviceApiClient;
 import com.energytracker.webclients.WeatherApiClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -24,8 +25,8 @@ public class ProducerLoggerJob extends AbstractProducerLoggerJob<Producer> {
 	private final GeneralDeviceService<Producer> producerService;
 
 	@Autowired
-	public ProducerLoggerJob(InfluxService influxService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, PowerPlantLimitsService powerPlantLimitsService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, GeneralDeviceService<Producer> producerService) {
-		super(influxService, weatherApiClient, storageHandler, powerPlantLimitsService, consumerProducerLoggerMonitorService);
+	public ProducerLoggerJob(InfluxService influxService, WeatherApiClient weatherApiClient, StorageHandler storageHandler, PowerPlantLimitsService powerPlantLimitsService, ConsumerProducerLoggerMonitorService consumerProducerLoggerMonitorService, DeviceApiClient deviceApiClient, GeneralDeviceService<Producer> producerService) {
+		super(influxService, weatherApiClient, storageHandler, powerPlantLimitsService, consumerProducerLoggerMonitorService, deviceApiClient);
 		this.producerService = producerService;
 	}
 
