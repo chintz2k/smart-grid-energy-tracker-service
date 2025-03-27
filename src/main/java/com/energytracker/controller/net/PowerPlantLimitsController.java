@@ -1,6 +1,7 @@
 package com.energytracker.controller.net;
 
 import com.energytracker.influx.service.net.InfluxPowerPlantLimitsService;
+import com.influxdb.query.FluxTable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,6 +32,28 @@ public class PowerPlantLimitsController {
 	public ResponseEntity<Map<String, Double>> getCurrentCommercialPowerPlantLimits() {
 		Map<String, Double> result = powerPlantLimitsService.getCurrentCommercialPowerPlantLimit();
 		return ResponseEntity.ok().body(result);
+	}
+
+	@GetMapping
+	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
+	public ResponseEntity<List<FluxTable>> getPowerPlantLimitsMeasurements(
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
+	) {
+		List<FluxTable> tables = powerPlantLimitsService.getPowerPlantLimitsMeasurements(
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType,
+				fillMissingValues
+		);
+
+		return ResponseEntity.ok().body(tables);
 	}
 
 	@GetMapping("/chart")

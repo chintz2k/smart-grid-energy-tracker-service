@@ -6,6 +6,7 @@ import com.energytracker.influx.util.ChartJsHelper;
 import com.energytracker.influx.util.InfluxConstants;
 import com.energytracker.influx.util.InfluxQueryHelper;
 import com.energytracker.security.SecurityService;
+import com.influxdb.query.FluxTable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -31,7 +32,7 @@ public class InfluxProducerService {
 		this.chartJsHelper = chartJsHelper;
 	}
 
-	public Map<String, Object> getProducersMeasurementsForChartJs(
+	public List<FluxTable> getProductionMeasurementsByDevice(
 			String deviceId,
 			String powerType,
 			String renewable,
@@ -75,10 +76,10 @@ public class InfluxProducerService {
 				fillMissingValues
 		);
 
-		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
+		return influxQueryHelper.executeFluxQuery(fluxQuery);
 	}
 
-	public Map<String, Object> getProducersByOwnerMeasurementsForChartJs(
+	public List<FluxTable> getProductionMeasurementsByOwner(
 			String ownerId,
 			String powerType,
 			String renewable,
@@ -125,10 +126,10 @@ public class InfluxProducerService {
 				fillMissingValues
 		);
 
-		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
+		return influxQueryHelper.executeFluxQuery(fluxQuery);
 	}
 
-	public Map<String, Object> getProducersOverallMeasurementsForChartJs(
+	public List<FluxTable> getProductionMeasurementsTotal(
 			String powerType,
 			String renewable,
 			String range,
@@ -159,7 +160,83 @@ public class InfluxProducerService {
 				fillMissingValues
 		);
 
-		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
+		return influxQueryHelper.executeFluxQuery(fluxQuery);
+	}
+
+	public Map<String, Object> getProductionMeasurementsByDeviceForChartJs(
+			String deviceId,
+			String powerType,
+			String renewable,
+			String range,
+			String start,
+			String end,
+			String aggregateWindowTime,
+			String aggregateWindowType,
+			boolean fillMissingValues
+	) {
+		return chartJsHelper.createMapForChartJsFromFluxTables(getProductionMeasurementsByDevice(
+						deviceId,
+						powerType,
+						renewable,
+						range,
+						start,
+						end,
+						aggregateWindowTime,
+						aggregateWindowType,
+						fillMissingValues
+				),
+				true
+		);
+	}
+
+	public Map<String, Object> getProductionMeasurementsByOwnerForChartJs(
+			String ownerId,
+			String powerType,
+			String renewable,
+			String range,
+			String start,
+			String end,
+			String aggregateWindowTime,
+			String aggregateWindowType,
+			boolean fillMissingValues
+	) {
+		return chartJsHelper.createMapForChartJsFromFluxTables(getProductionMeasurementsByOwner(
+						ownerId,
+						powerType,
+						renewable,
+						range,
+						start,
+						end,
+						aggregateWindowTime,
+						aggregateWindowType,
+						fillMissingValues
+				),
+				true
+		);
+	}
+
+	public Map<String, Object> getProductionMeasurementsTotalForChartJs(
+			String powerType,
+			String renewable,
+			String range,
+			String start,
+			String end,
+			String aggregateWindowTime,
+			String aggregateWindowType,
+			boolean fillMissingValues
+	) {
+		return chartJsHelper.createMapForChartJsFromFluxTables(getProductionMeasurementsTotal(
+						powerType,
+						renewable,
+						range,
+						start,
+						end,
+						aggregateWindowTime,
+						aggregateWindowType,
+						fillMissingValues
+				),
+				true
+		);
 	}
 
 	private Map<String, String> getValidPowerType(String powerType, Map<String, String> filterMap) {

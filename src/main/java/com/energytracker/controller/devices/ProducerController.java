@@ -1,6 +1,7 @@
 package com.energytracker.controller.devices;
 
 import com.energytracker.influx.service.devices.InfluxProducerService;
+import com.influxdb.query.FluxTable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -25,8 +27,8 @@ public class ProducerController {
 		this.producerService = producerService;
 	}
 
-	@GetMapping("/devices/chart")
-	public ResponseEntity<Map<String, Object>> getProducersMeasurementsForChartJs(
+	@GetMapping("/devices")
+	public ResponseEntity<List<FluxTable>> getProductionMeasurementsByDevice(
 			@RequestParam(required = false) String deviceId,
 			@RequestParam(required = false) String powerType,
 			@RequestParam(required = false) String renewable,
@@ -37,7 +39,87 @@ public class ProducerController {
 			@RequestParam(required = false) String aggregateWindowType,
 			@RequestParam(required = false) boolean fillMissingValues
 	) {
-		Map<String, Object> mapforChartJs = producerService.getProducersMeasurementsForChartJs(
+		List<FluxTable> tables = producerService.getProductionMeasurementsByDevice(
+				deviceId,
+				powerType,
+				renewable,
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType,
+				fillMissingValues
+		);
+
+		return ResponseEntity.ok().body(tables);
+	}
+
+	@GetMapping("/owner")
+	public ResponseEntity<List<FluxTable>> getProductionMeasurementsByOwner(
+			@RequestParam(required = false) String ownerId,
+			@RequestParam(required = false) String powerType,
+			@RequestParam(required = false) String renewable,
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
+	) {
+		List<FluxTable> tables = producerService.getProductionMeasurementsByOwner(
+				ownerId,
+				powerType,
+				renewable,
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType,
+				fillMissingValues
+		);
+
+		return ResponseEntity.ok().body(tables);
+	}
+
+	@GetMapping("/overall")
+	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
+	public ResponseEntity<List<FluxTable>> getProductionMeasurementsTotal(
+			@RequestParam(required = false) String powerType,
+			@RequestParam(required = false) String renewable,
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
+	) {
+		List<FluxTable> tables = producerService.getProductionMeasurementsTotal(
+				powerType,
+				renewable,
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType,
+				fillMissingValues
+		);
+
+		return ResponseEntity.ok().body(tables);
+	}
+
+	@GetMapping("/devices/chart")
+	public ResponseEntity<Map<String, Object>> getProductionMeasurementsByDeviceForChartJs(
+			@RequestParam(required = false) String deviceId,
+			@RequestParam(required = false) String powerType,
+			@RequestParam(required = false) String renewable,
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
+	) {
+		Map<String, Object> mapforChartJs = producerService.getProductionMeasurementsByDeviceForChartJs(
 				deviceId,
 				powerType,
 				renewable,
@@ -53,7 +135,7 @@ public class ProducerController {
 	}
 
 	@GetMapping("/owner/chart")
-	public ResponseEntity<Map<String, Object>> getProducersByOwnerMeasurementsForChartJs(
+	public ResponseEntity<Map<String, Object>> getProductionMeasurementsByOwnerForChartJs(
 			@RequestParam(required = false) String ownerId,
 			@RequestParam(required = false) String powerType,
 			@RequestParam(required = false) String renewable,
@@ -64,7 +146,7 @@ public class ProducerController {
 			@RequestParam(required = false) String aggregateWindowType,
 			@RequestParam(required = false) boolean fillMissingValues
 	) {
-		Map<String, Object> mapforChartJs = producerService.getProducersByOwnerMeasurementsForChartJs(
+		Map<String, Object> mapforChartJs = producerService.getProductionMeasurementsByOwnerForChartJs(
 				ownerId,
 				powerType,
 				renewable,
@@ -81,7 +163,7 @@ public class ProducerController {
 
 	@GetMapping("/overall/chart")
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
-	public ResponseEntity<Map<String, Object>> getProducersOverallMeasurementsForChartJs(
+	public ResponseEntity<Map<String, Object>> getProductionMeasurementsTotalForChartJs(
 			@RequestParam(required = false) String powerType,
 			@RequestParam(required = false) String renewable,
 			@RequestParam(required = false) String range,
@@ -91,7 +173,7 @@ public class ProducerController {
 			@RequestParam(required = false) String aggregateWindowType,
 			@RequestParam(required = false) boolean fillMissingValues
 	) {
-		Map<String, Object> mapforChartJs = producerService.getProducersOverallMeasurementsForChartJs(
+		Map<String, Object> mapforChartJs = producerService.getProductionMeasurementsTotalForChartJs(
 				powerType,
 				renewable,
 				range,

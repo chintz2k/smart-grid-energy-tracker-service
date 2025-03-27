@@ -28,7 +28,7 @@ public class InfluxDeviceService {
 		this.securityService = securityService;
 	}
 
-	public Map<String, Object> getDevicesOverallMeasurementsForChartJs(
+	public List<FluxTable> getConsumptionAndProductionMeasurementsByOwnerAsAdmin(
 			Long userId,
 			String range,
 			String start,
@@ -73,10 +73,11 @@ public class InfluxDeviceService {
 					fillMissingValues
 			);
 		}
-		return chartJsHelper.createMapForChartJsFromQuery(query, true);
+
+		return influxQueryHelper.executeFluxQuery(query);
 	}
 
-	public Map<String, Object> getPrivateOverallMeasurementsForChartJs(
+	public List<FluxTable> getConsumptionAndProductionMeasurementsByOwnerAsUser(
 			String range,
 			String start,
 			String end,
@@ -102,7 +103,50 @@ public class InfluxDeviceService {
 				aggregateWindowType,
 				fillMissingValues
 		);
-		return chartJsHelper.createMapForChartJsFromQuery(query, true);
+
+		return influxQueryHelper.executeFluxQuery(query);
+	}
+
+	public Map<String, Object> getConsumptionAndProductionMeasurementsByOwnerAsAdminForChartJs(
+			Long userId,
+			String range,
+			String start,
+			String end,
+			String aggregateWindowTime,
+			String aggregateWindowType,
+			boolean fillMissingValues
+	) {
+		return chartJsHelper.createMapForChartJsFromFluxTables(getConsumptionAndProductionMeasurementsByOwnerAsAdmin(
+						userId,
+						range,
+						start,
+						end,
+						aggregateWindowTime,
+						aggregateWindowType,
+						fillMissingValues
+				),
+				true
+		);
+	}
+
+	public Map<String, Object> getConsumptionAndProductionMeasurementsByOwnerAsUserForChartJs(
+			String range,
+			String start,
+			String end,
+			String aggregateWindowTime,
+			String aggregateWindowType,
+			boolean fillMissingValues
+	) {
+		return chartJsHelper.createMapForChartJsFromFluxTables(getConsumptionAndProductionMeasurementsByOwnerAsUser(
+						range,
+						start,
+						end,
+						aggregateWindowTime,
+						aggregateWindowType,
+						fillMissingValues
+				),
+				true
+		);
 	}
 
 	public Map<String, Double> getCurrentAndAveragePrivate(String measurement) {

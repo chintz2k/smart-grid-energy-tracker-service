@@ -52,7 +52,7 @@ public class InfluxNetBalanceService {
 		return currentBalanceMap;
 	}
 
-	public Map<String, Object> getNetBalanceMeasurementsForChartJs(
+	public List<FluxTable> getNetBalanceMeasurements(
 			String range,
 			String start,
 			String end,
@@ -76,6 +76,26 @@ public class InfluxNetBalanceService {
 				fillMissingValues
 		);
 
-		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
+		return influxQueryHelper.executeFluxQuery(fluxQuery);
+	}
+
+	public Map<String, Object> getNetBalanceMeasurementsForChartJs(
+			String range,
+			String start,
+			String end,
+			String aggregateWindowTime,
+			String aggregateWindowType,
+			boolean fillMissingValues
+	) {
+		return chartJsHelper.createMapForChartJsFromFluxTables(getNetBalanceMeasurements(
+						range,
+						start,
+						end,
+						aggregateWindowTime,
+						aggregateWindowType,
+						fillMissingValues
+				),
+				true
+		);
 	}
 }

@@ -2,11 +2,13 @@ package com.energytracker.controller.devices;
 
 import com.energytracker.influx.service.devices.InfluxDeviceService;
 import com.energytracker.influx.util.InfluxConstants;
+import com.influxdb.query.FluxTable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -23,9 +25,9 @@ public class DeviceController {
 		this.deviceService = deviceService;
 	}
 
-	@GetMapping("/overall/chart")
+	@GetMapping("/overall")
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
-	public ResponseEntity<Map<String, Object>> getConsumersOverallMeasurementsForChartJs(
+	public ResponseEntity<List<FluxTable>> getConsumptionAndProductionMeasurementsByOwnerAsAdmin(
 			@RequestParam(required = false) Long userId,
 			@RequestParam(required = false) String range,
 			@RequestParam(required = false) String start,
@@ -34,7 +36,50 @@ public class DeviceController {
 			@RequestParam(required = false) String aggregateWindowType,
 			@RequestParam(required = false) boolean fillMissingValues
 	) {
-		Map<String, Object> mapforChartJs = deviceService.getDevicesOverallMeasurementsForChartJs(
+		List<FluxTable> tables = deviceService.getConsumptionAndProductionMeasurementsByOwnerAsAdmin(
+				userId,
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType,
+				fillMissingValues
+		);
+		return ResponseEntity.ok().body(tables);
+	}
+
+	@GetMapping("/private")
+	public ResponseEntity<List<FluxTable>> getConsumptionAndProductionMeasurementsByOwnerAsUser(
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
+	) {
+		List<FluxTable> tables = deviceService.getConsumptionAndProductionMeasurementsByOwnerAsUser(
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType,
+				fillMissingValues
+		);
+		return ResponseEntity.ok().body(tables);
+	}
+
+	@GetMapping("/overall/chart")
+	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
+	public ResponseEntity<Map<String, Object>> getConsumptionAndProductionMeasurementsByOwnerAsAdminForChartJs(
+			@RequestParam(required = false) Long userId,
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
+	) {
+		Map<String, Object> mapforChartJs = deviceService.getConsumptionAndProductionMeasurementsByOwnerAsAdminForChartJs(
 				userId,
 				range,
 				start,
@@ -47,7 +92,7 @@ public class DeviceController {
 	}
 
 	@GetMapping("/private/chart")
-	public ResponseEntity<Map<String, Object>> getPrivateOverallMeasurementsForChartJs(
+	public ResponseEntity<Map<String, Object>> getConsumptionAndProductionMeasurementsByOwnerAsUserForChartJs(
 			@RequestParam(required = false) String range,
 			@RequestParam(required = false) String start,
 			@RequestParam(required = false) String end,
@@ -55,7 +100,7 @@ public class DeviceController {
 			@RequestParam(required = false) String aggregateWindowType,
 			@RequestParam(required = false) boolean fillMissingValues
 	) {
-		Map<String, Object> mapforChartJs = deviceService.getPrivateOverallMeasurementsForChartJs(
+		Map<String, Object> mapforChartJs = deviceService.getConsumptionAndProductionMeasurementsByOwnerAsUserForChartJs(
 				range,
 				start,
 				end,

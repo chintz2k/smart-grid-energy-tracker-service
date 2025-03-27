@@ -1,6 +1,7 @@
 package com.energytracker.controller.devices;
 
 import com.energytracker.influx.service.devices.InfluxStorageService;
+import com.influxdb.query.FluxTable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -25,8 +27,8 @@ public class StorageController {
 		this.storageService = storageService;
 	}
 
-	@GetMapping("/devices/chart")
-	public ResponseEntity<Map<String, Object>> getStoragesMeasurementsForChartJs(
+	@GetMapping("/devices")
+	public ResponseEntity<List<FluxTable>> getStorageMeasurementsByDevice(
 			@RequestParam(required = false) String deviceId,
 			@RequestParam(required = false) String field,
 			@RequestParam(required = false) String range,
@@ -36,7 +38,83 @@ public class StorageController {
 			@RequestParam(required = false) String aggregateWindowType,
 			@RequestParam(required = false) boolean fillMissingValues
 	) {
-		Map<String, Object> mapforChartJs = storageService.getStoragesMeasurementsForChartJs(
+		List<FluxTable> tables = storageService.getStorageMeasurementsByDevice(
+				deviceId,
+				field,
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType,
+				fillMissingValues
+		);
+
+		return ResponseEntity.ok().body(tables);
+	}
+
+	@GetMapping("/owner")
+	public ResponseEntity<List<FluxTable>> getStorageMeasurementsByOwner(
+			@RequestParam(required = false) String ownerId,
+			@RequestParam(required = false) String field,
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
+	) {
+		List<FluxTable> tables = storageService.getStorageMeasurementsByOwner(
+				ownerId,
+				field,
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType,
+				fillMissingValues
+		);
+
+		return ResponseEntity.ok().body(tables);
+	}
+
+	@GetMapping("/overall")
+	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
+	public ResponseEntity<List<FluxTable>> getStorageMeasurementsTotal(
+			@RequestParam(required = false) String status,
+			@RequestParam(required = false) String field,
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
+	) {
+		List<FluxTable> tables = storageService.getStorageMeasurementsTotal(
+				status,
+				field,
+				range,
+				start,
+				end,
+				aggregateWindowTime,
+				aggregateWindowType,
+				fillMissingValues
+		);
+
+		return ResponseEntity.ok().body(tables);
+	}
+
+	@GetMapping("/devices/chart")
+	public ResponseEntity<Map<String, Object>> getStorageMeasurementsByDeviceForChartJs(
+			@RequestParam(required = false) String deviceId,
+			@RequestParam(required = false) String field,
+			@RequestParam(required = false) String range,
+			@RequestParam(required = false) String start,
+			@RequestParam(required = false) String end,
+			@RequestParam(required = false) String aggregateWindowTime,
+			@RequestParam(required = false) String aggregateWindowType,
+			@RequestParam(required = false) boolean fillMissingValues
+	) {
+		Map<String, Object> mapforChartJs = storageService.getStorageMeasurementsByDeviceForChartJs(
 				deviceId,
 				field,
 				range,
@@ -51,7 +129,7 @@ public class StorageController {
 	}
 
 	@GetMapping("/owner/chart")
-	public ResponseEntity<Map<String, Object>> getStoragesByOwnerMeasurementsForChartJs(
+	public ResponseEntity<Map<String, Object>> getStorageMeasurementsByOwnerForChartJs(
 			@RequestParam(required = false) String ownerId,
 			@RequestParam(required = false) String field,
 			@RequestParam(required = false) String range,
@@ -61,7 +139,7 @@ public class StorageController {
 			@RequestParam(required = false) String aggregateWindowType,
 			@RequestParam(required = false) boolean fillMissingValues
 	) {
-		Map<String, Object> mapforChartJs = storageService.getStoragesByOwnerMeasurementsForChartJs(
+		Map<String, Object> mapforChartJs = storageService.getStorageMeasurementsByOwnerForChartJs(
 				ownerId,
 				field,
 				range,
@@ -77,7 +155,7 @@ public class StorageController {
 
 	@GetMapping("/overall/chart")
 	@PreAuthorize("hasRole('ADMIN') or hasRole('SYSTEM')")
-	public ResponseEntity<Map<String, Object>> getStoragesOverallMeasurementsForChartJs(
+	public ResponseEntity<Map<String, Object>> getStorageMeasurementsTotalForChartJs(
 			@RequestParam(required = false) String status,
 			@RequestParam(required = false) String field,
 			@RequestParam(required = false) String range,
@@ -87,7 +165,7 @@ public class StorageController {
 			@RequestParam(required = false) String aggregateWindowType,
 			@RequestParam(required = false) boolean fillMissingValues
 	) {
-		Map<String, Object> mapforChartJs = storageService.getStoragesOverallMeasurementsForChartJs(
+		Map<String, Object> mapforChartJs = storageService.getStorageMeasurementsTotalForChartJs(
 				status,
 				field,
 				range,

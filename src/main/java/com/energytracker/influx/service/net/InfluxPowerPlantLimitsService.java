@@ -52,7 +52,7 @@ public class InfluxPowerPlantLimitsService {
 		return commercialPowerPlantLimitMap;
 	}
 
-	public Map<String, Object> getPowerPlantLimitsMeasurementsForChartJs(
+	public List<FluxTable> getPowerPlantLimitsMeasurements(
 			String range,
 			String start,
 			String end,
@@ -76,6 +76,26 @@ public class InfluxPowerPlantLimitsService {
 				fillMissingValues
 		);
 
-		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
+		return influxQueryHelper.executeFluxQuery(fluxQuery);
+	}
+
+	public Map<String, Object> getPowerPlantLimitsMeasurementsForChartJs(
+			String range,
+			String start,
+			String end,
+			String aggregateWindowTime,
+			String aggregateWindowType,
+			boolean fillMissingValues
+	) {
+		return chartJsHelper.createMapForChartJsFromFluxTables(getPowerPlantLimitsMeasurements(
+						range,
+						start,
+						end,
+						aggregateWindowTime,
+						aggregateWindowType,
+						fillMissingValues
+				),
+				true
+		);
 	}
 }

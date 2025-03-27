@@ -31,7 +31,7 @@ public class InfluxStorageService {
 		this.chartJsHelper = chartJsHelper;
 	}
 
-	public Map<String, Object> getStoragesMeasurementsForChartJs(
+	public List<FluxTable> getStorageMeasurementsByDevice(
 			String deviceId,
 			String field,
 			String range,
@@ -76,10 +76,10 @@ public class InfluxStorageService {
 				fillMissingValues
 		);
 
-		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
+		return influxQueryHelper.executeFluxQuery(fluxQuery);
 	}
 
-	public Map<String, Object> getStoragesByOwnerMeasurementsForChartJs(
+	public List<FluxTable> getStorageMeasurementsByOwner(
 			String ownerId,
 			String field,
 			String range,
@@ -126,10 +126,10 @@ public class InfluxStorageService {
 				fillMissingValues
 		);
 
-		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
+		return influxQueryHelper.executeFluxQuery(fluxQuery);
 	}
 
-	public Map<String, Object> getStoragesOverallMeasurementsForChartJs(
+	public List<FluxTable> getStorageMeasurementsTotal(
 			String status,
 			String field,
 			String range,
@@ -145,7 +145,7 @@ public class InfluxStorageService {
 		if (status != null && !status.isBlank()) {
 			if (status.equals("commercial") || status.equals("kommerziell") || status.equals("commercial storage")) {
 				measurementName = InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_COMMERCIAL;
-			} else if (status.equals("private") || status.equals("privat") || status.equals("private storage")){
+			} else if (status.equals("private") || status.equals("privat") || status.equals("private storage")) {
 				measurementName = InfluxConstants.MEASUREMENT_NAME_STORAGE_TOTAL_PRIVATE;
 			}
 		}
@@ -169,7 +169,79 @@ public class InfluxStorageService {
 				fillMissingValues
 		);
 
-		return chartJsHelper.createMapForChartJsFromQuery(fluxQuery, true);
+		return influxQueryHelper.executeFluxQuery(fluxQuery);
+	}
+
+	public Map<String, Object> getStorageMeasurementsByDeviceForChartJs(
+			String deviceId,
+			String field,
+			String range,
+			String start,
+			String end,
+			String aggregateWindowTime,
+			String aggregateWindowType,
+			boolean fillMissingValues
+	) {
+		return chartJsHelper.createMapForChartJsFromFluxTables(getStorageMeasurementsByDevice(
+						deviceId,
+						field,
+						range,
+						start,
+						end,
+						aggregateWindowTime,
+						aggregateWindowType,
+						fillMissingValues
+				),
+				true
+		);
+	}
+
+	public Map<String, Object> getStorageMeasurementsByOwnerForChartJs(
+			String ownerId,
+			String field,
+			String range,
+			String start,
+			String end,
+			String aggregateWindowTime,
+			String aggregateWindowType,
+			boolean fillMissingValues
+	) {
+		return chartJsHelper.createMapForChartJsFromFluxTables(getStorageMeasurementsByOwner(
+						ownerId,
+						field,
+						range,
+						start,
+						end,
+						aggregateWindowTime,
+						aggregateWindowType,
+						fillMissingValues
+				),
+				true
+		);
+	}
+
+	public Map<String, Object> getStorageMeasurementsTotalForChartJs(
+			String status,
+			String field,
+			String range,
+			String start,
+			String end,
+			String aggregateWindowTime,
+			String aggregateWindowType,
+			boolean fillMissingValues
+	) {
+		return chartJsHelper.createMapForChartJsFromFluxTables(getStorageMeasurementsTotal(
+						status,
+						field,
+						range,
+						start,
+						end,
+						aggregateWindowTime,
+						aggregateWindowType,
+						fillMissingValues
+				),
+				true
+		);
 	}
 
 	private Map<String, String> getValidField(String field, Map<String, String> filterMap) {
@@ -193,15 +265,15 @@ public class InfluxStorageService {
 			}
 		}
 		String query = String.format("""
-        from(bucket: "%s")
-          |> range(start: -30d)
-          |> filter(fn: (r) => r._measurement == "%s" or r._measurement == "%s")
-          |> filter(fn: (r) => r.ownerId == "%s")
-          |> filter(fn: (r) => r._field == "currentCharge" or r._field == "capacity")
-          |> group(columns: ["_field", "deviceId"])
-          |> last()
-          |> group(columns: ["_field"])
-        """, InfluxConstants.BUCKET_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL, ownerId);
+				from(bucket: "%s")
+				  |> range(start: -30d)
+				  |> filter(fn: (r) => r._measurement == "%s" or r._measurement == "%s")
+				  |> filter(fn: (r) => r.ownerId == "%s")
+				  |> filter(fn: (r) => r._field == "currentCharge" or r._field == "capacity")
+				  |> group(columns: ["_field", "deviceId"])
+				  |> last()
+				  |> group(columns: ["_field"])
+				""", InfluxConstants.BUCKET_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL, ownerId);
 
 		return getSummedUpMapFromQuery(query);
 	}
@@ -209,14 +281,14 @@ public class InfluxStorageService {
 	public Map<String, Double> getLatestSummaryOfStoragesTotal() {
 		securityService.checkIfUserIsAdminOrIsSystem();
 		String query = String.format("""
-        from(bucket: "%s")
-          |> range(start: -30d)
-          |> filter(fn: (r) => r._measurement == "%s" or r._measurement == "%s")
-          |> filter(fn: (r) => r._field == "currentCharge" or r._field == "capacity")
-          |> group(columns: ["_field", "deviceId"])
-          |> last()
-          |> group(columns: ["_field"])
-        """, InfluxConstants.BUCKET_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL);
+				from(bucket: "%s")
+				  |> range(start: -30d)
+				  |> filter(fn: (r) => r._measurement == "%s" or r._measurement == "%s")
+				  |> filter(fn: (r) => r._field == "currentCharge" or r._field == "capacity")
+				  |> group(columns: ["_field", "deviceId"])
+				  |> last()
+				  |> group(columns: ["_field"])
+				""", InfluxConstants.BUCKET_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE, InfluxConstants.MEASUREMENT_NAME_STORAGE_COMMERCIAL);
 
 		return getSummedUpMapFromQuery(query);
 	}
