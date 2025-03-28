@@ -35,7 +35,7 @@ public class DeviceApiClient {
 		if (!Objects.equals(type, "consumers") && !Objects.equals(type, "producers")) {
 			throw new IllegalArgumentException("Invalid device type");
 		}
-		String url = "http://home-builder-service/api/" + type + "/toggleNoSendEvent?active=" + active;
+		String url = "http://home-builder-service/api/" + type + "/setActiveByListNoSendEvent?active=" + active;
 		String accessToken = tokenService.getAccessToken();
 
 		HttpHeaders headers = new HttpHeaders();
@@ -52,9 +52,9 @@ public class DeviceApiClient {
 					new ParameterizedTypeReference<Map<String, String>>() {}
 			);
 		} catch (HttpClientErrorException e) {
-			logger.error("Client-Fehler: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+			logger.error("Client-Fehler: {} - {} - {}", e.getStatusCode(), e.getResponseBodyAsString(), url);
 		} catch (HttpServerErrorException e) {
-			logger.error("Server-Fehler: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+			logger.error("Server-Fehler: {} - {} - {}", e.getStatusCode(), e.getResponseBodyAsString(), url);
 		} catch (ResourceAccessException e) {
 			logger.error("Netzwerkproblem oder API nicht erreichbar: {}", e.getMessage());
 		} catch (RestClientException e) {
