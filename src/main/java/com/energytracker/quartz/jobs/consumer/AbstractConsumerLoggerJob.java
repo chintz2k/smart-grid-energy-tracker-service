@@ -22,10 +22,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -69,12 +66,13 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			long readActiveDevicesTime = System.currentTimeMillis() - startTime;
 
 			List<ConsumptionMeasurement> measurementsBatch = Collections.synchronizedList(new ArrayList<>());
+			Set<T> startedConsumers = Collections.synchronizedSet(new HashSet<>());
 			List<T> updatedConsumers = Collections.synchronizedList(new ArrayList<>());
 			List<T> removedConsumers = Collections.synchronizedList(new ArrayList<>());
 			Map<Long, List<ConsumptionMeasurement>> ownerConsumptionData = new ConcurrentHashMap<>();
 
 			long beforeProcessMethod = System.currentTimeMillis();
-			processSyncedInBatches(activeConsumers, measurementsBatch, updatedConsumers, removedConsumers, ownerConsumptionData);
+			processSyncedInBatches(activeConsumers, measurementsBatch, startedConsumers, updatedConsumers, removedConsumers, ownerConsumptionData);
 			long processMethodTime = System.currentTimeMillis() - beforeProcessMethod;
 
 			long beforeUpdateStorages = System.currentTimeMillis();
@@ -90,9 +88,23 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			int removedConsumersCount = removedConsumers.size();
 			long cpuIntensiveTime = System.currentTimeMillis() - startTime;
 
+			long beforeWebRequests = System.currentTimeMillis();
+			Set<Long> startedDeviceIds = new HashSet<>();
+			for (T consumer : startedConsumers) {
+				startedDeviceIds.add(consumer.getDeviceId());
+			}
+			deviceApiClient.setActiveByListAndNoSendEvent(startedDeviceIds, true, "consumers");
+			Set<Long> removedDeviceIds = new HashSet<>();
+			for (T consumer : removedConsumers) {
+				removedDeviceIds.add(consumer.getDeviceId());
+			}
+			deviceApiClient.setActiveByListAndNoSendEvent(removedDeviceIds, false, "consumers");
+			long webRequestsTime = System.currentTimeMillis() - beforeWebRequests;
+
 			long beforeUpdateDatabaseTime = System.currentTimeMillis();
 			updateDatabase(updatedConsumers, removedConsumers, measurementsBatch, totalConsumptionOfOwnerByTimestamp, totalConsumptionByTimestamp);
 			long updateDatabaseTime = System.currentTimeMillis() - beforeUpdateDatabaseTime;
+
 			long overallTime = System.currentTimeMillis() - startTime;
 
 			if (measurementsCount > 0) {
@@ -105,7 +117,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 								cpuIntensiveTime,
 								updateStoragesTime,
 								updateDatabaseTime,
-								0L,
+								webRequestsTime,
 								overallTime,
 								updatedConsumersCount,
 								removedConsumersCount,
@@ -122,6 +134,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	private void processSyncedInBatches(
 			List<T> activeConsumers,
 			List<ConsumptionMeasurement> measurementsBatch,
+			Set<T> startedConsumers,
 			List<T> updatedConsumers,
 			List<T> removedConsumers,
 			Map<Long, List<ConsumptionMeasurement>> ownerConsumptionData
@@ -136,7 +149,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 				if (id != null) {
 					T latestConsumer = getConsumerById(id);
 					if (latestConsumer != null) {
-						processConsumer(latestConsumer, measurementsBatch, updatedConsumers, removedConsumers, ownerConsumptionData);
+						processConsumer(latestConsumer, measurementsBatch, startedConsumers, updatedConsumers, removedConsumers, ownerConsumptionData);
 					}
 				}
 			}
@@ -167,9 +180,6 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 		}
 
 		if (!removedConsumers.isEmpty()) {
-			for (T consumer : removedConsumers) {
-				deviceApiClient.toggleDevice(consumer.getDeviceId(), false);
-			}
 			removeAll(removedConsumers);
 		}
 	}
@@ -177,6 +187,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 	public void processConsumer(
 			T consumer,
 			List<ConsumptionMeasurement> measurementsBatch,
+			Set<T> startedConsumers,
 			List<T> updatedConsumers,
 			List<T> removedConsumers,
 			Map<Long, List<ConsumptionMeasurement>> ownerConsumptionData
@@ -199,7 +210,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			}
 
 			Instant prev = consumer.getLastUpdate() == null ? consumer.getStartTime() : consumer.getLastUpdate();
-			Instant intervalStart = processStartPeriod(consumer, justStarted, startTime, measurementsBatch);
+			Instant intervalStart = processStartPeriod(consumer, justStarted, startTime, measurementsBatch, startedConsumers);
 
 			// Falls das Gerät neu gestartet wird und direkt beendet werden kann
 			if (justStarted && canFinish && !intervalStart.isBefore(endTime)) {
@@ -229,14 +240,15 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 			T consumer,
 			boolean justStarted,
 			Instant startTime,
-			List<ConsumptionMeasurement> measurementsBatch
+			List<ConsumptionMeasurement> measurementsBatch,
+			Set<T> startedConsumers
 	) {
 		if (justStarted) {
 			// Verbrauch initialisieren, wenn das Gerät gerade eingeschaltet wurde
 			ConsumptionMeasurement zeroMeasurement = createZeroMeasurementAtStart(consumer);
 			measurementsBatch.add(zeroMeasurement);
 
-			deviceApiClient.toggleDevice(consumer.getDeviceId(), true);
+			startedConsumers.add(consumer);
 
 			Instant alignedStart = startTime.minusSeconds(startTime.getEpochSecond() % getIntervalInSeconds())
 					.truncatedTo(ChronoUnit.SECONDS)

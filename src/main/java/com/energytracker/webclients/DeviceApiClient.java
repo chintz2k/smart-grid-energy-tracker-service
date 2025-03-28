@@ -11,6 +11,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.*;
 
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
 /**
  * @author André Heinen
  */
@@ -27,23 +31,25 @@ public class DeviceApiClient {
 		this.tokenService = tokenService;
 	}
 
-	public void toggleDevice(Long deviceId, boolean active) {
-		String url = "http://home-builder-service/api/devices/" + deviceId + "/toggleNoSendEvent?active=" + active;
+	public void setActiveByListAndNoSendEvent(Set<Long> idList, boolean active, String type) {
+		if (!Objects.equals(type, "consumers") && !Objects.equals(type, "producers")) {
+			throw new IllegalArgumentException("Invalid device type");
+		}
+		String url = "http://home-builder-service/api/" + type + "/toggleNoSendEvent?active=" + active;
 		String accessToken = tokenService.getAccessToken();
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setBearerAuth(accessToken);
 		headers.set("Content-Type", "application/json");
 
-		HttpEntity<?> entity = new HttpEntity<>(headers);
+		HttpEntity<Set<Long>> requestEntity = new HttpEntity<>(idList, headers);
 
 		try {
 			restTemplate.exchange(
 					url,
 					HttpMethod.PUT,
-					entity,
-					new ParameterizedTypeReference<>() {}
-
+					requestEntity,
+					new ParameterizedTypeReference<Map<String, String>>() {}
 			);
 		} catch (HttpClientErrorException e) {
 			logger.error("Client-Fehler: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());

@@ -80,20 +80,21 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		long readActiveDevicesTime = System.currentTimeMillis() - startTime;
 
 		List<ProductionMeasurement> measurementsBatch = Collections.synchronizedList(new ArrayList<>());
+		Set<T> startedProducers = Collections.synchronizedSet(new HashSet<>());
 		List<T> updatedProducers = Collections.synchronizedList(new ArrayList<>());
 		List<T> removedProducers = Collections.synchronizedList(new ArrayList<>());
 		Map<Long, List<ProductionMeasurement>> ownerProductionData = new ConcurrentHashMap<>();
 
-		long beforeWebRequests = System.currentTimeMillis();
+		long beforeWebRequestsForWeather = System.currentTimeMillis();
 		WeatherResponse response = weatherApiClient.getWeather();
 		if (response != null) {
 			sunPowerModificator = response.getSolarPower();
 			windPowerModificator = response.getWindPower();
 		}
-		long webRequestsTime = System.currentTimeMillis() - beforeWebRequests;
+		long webRequestsTimeForWeather = System.currentTimeMillis() - beforeWebRequestsForWeather;
 
 		long beforeProcessMethod = System.currentTimeMillis();
-		processSyncedInBatches(activeProducers, measurementsBatch, updatedProducers, removedProducers, ownerProductionData);
+		processSyncedInBatches(activeProducers, measurementsBatch, startedProducers, updatedProducers, removedProducers, ownerProductionData);
 		long processMethodTime = System.currentTimeMillis() - beforeProcessMethod;
 
 		long beforeUpdateStorages = System.currentTimeMillis();
@@ -115,6 +116,20 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		int updatedProducersCount = updatedProducers.size();
 		int removedProducersCount = removedProducers.size();
 		long cpuIntensiveTime = System.currentTimeMillis() - startTime;
+
+		long beforeWebRequestsForDevice = System.currentTimeMillis();
+		Set<Long> startedDeviceIds = new HashSet<>();
+		for (T producer : startedProducers) {
+			startedDeviceIds.add(producer.getDeviceId());
+		}
+		deviceApiClient.setActiveByListAndNoSendEvent(startedDeviceIds, true, "producers");
+		Set<Long> removedDeviceIds = new HashSet<>();
+		for (T producer : removedProducers) {
+			removedDeviceIds.add(producer.getDeviceId());
+		}
+		deviceApiClient.setActiveByListAndNoSendEvent(removedDeviceIds, false, "producers");
+		long webRequestsForDeviceTime = System.currentTimeMillis() - beforeWebRequestsForDevice;
+		long webRequestsTime = webRequestsTimeForWeather + webRequestsForDeviceTime;
 
 		long beforeupdateDatabaseTime = System.currentTimeMillis();
 		updateDatabase(updatedProducers, removedProducers, measurementsBatch, totalProductionByOwnerAndPowerTypeAndTimestamp, totalProductionByOwnerAndByTimestamp, totalProductionByPowerTypeAndTimestamp, totalProductionByTimestamp);
@@ -141,27 +156,10 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		}
 	}
 
-	private void processSynced(
-			List<T> activeProducers,
-			List<ProductionMeasurement> measurementsBatch,
-			List<T> updatedProducers,
-			List<T> removedProducers,
-			Map<Long, List<ProductionMeasurement>> ownerProductionData
-	) {
-		for (T producer : activeProducers) {
-			Long id = getDeviceId(producer);
-			if (id != null) {
-				T latestProducer = getProducerById(id);
-				if (latestProducer != null) {
-					processProducer(latestProducer, measurementsBatch, updatedProducers, removedProducers, ownerProductionData);
-				}
-			}
-		}
-	}
-
 	private void processSyncedInBatches(
 			List<T> activeProducers,
 			List<ProductionMeasurement> measurementsBatch,
+			Set<T> startedProducers,
 			List<T> updatedProducers,
 			List<T> removedProducers,
 			Map<Long, List<ProductionMeasurement>> ownerProductionData
@@ -176,7 +174,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 				if (id != null) {
 					T latestProducer = getProducerById(id);
 					if (latestProducer != null) {
-						processProducer(latestProducer, measurementsBatch, updatedProducers, removedProducers, ownerProductionData);
+						processProducer(latestProducer, measurementsBatch, startedProducers, updatedProducers, removedProducers, ownerProductionData);
 					}
 				}
 			}
@@ -217,9 +215,6 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 		}
 
 		if (!removedProducers.isEmpty()) {
-			for (T producer : removedProducers) {
-				deviceApiClient.toggleDevice(producer.getDeviceId(), false);
-			}
 			removeAll(removedProducers);
 		}
 	}
@@ -227,6 +222,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 	public void processProducer(
 			T producer,
 			List<ProductionMeasurement> measurementsBatch,
+			Set<T> startedProducers,
 			List<T> updatedProducers,
 			List<T> removedProducers,
 			Map<Long, List<ProductionMeasurement>> ownerProductionData
@@ -249,7 +245,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			}
 
 			Instant prev = producer.getLastUpdate() == null ? producer.getStartTime() : producer.getLastUpdate();
-			Instant intervalStart = processStartPeriod(producer, justStarted, startTime, measurementsBatch);
+			Instant intervalStart = processStartPeriod(producer, justStarted, startTime, measurementsBatch, startedProducers);
 
 			// Falls das Gerät neu gestartet wird und direkt beendet werden kann
 			if (justStarted && canFinish && !intervalStart.isBefore(endTime)) {
@@ -279,14 +275,15 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			T producer,
 			boolean justStarted,
 			Instant startTime,
-			List<ProductionMeasurement> measurementsBatch
+			List<ProductionMeasurement> measurementsBatch,
+			Set<T> startedProducers
 	) {
 		if (justStarted) {
 			// Verbrauch initialisieren, wenn das Gerät gerade eingeschaltet wurde
 			ProductionMeasurement zeroMeasurement = createZeroMeasurementAtStart(producer);
 			measurementsBatch.add(zeroMeasurement);
 
-			deviceApiClient.toggleDevice(producer.getDeviceId(), true);
+			startedProducers.add(producer);
 
 			return startTime.minusSeconds(startTime.getEpochSecond() % getIntervalInSeconds())
 					.truncatedTo(ChronoUnit.SECONDS)
