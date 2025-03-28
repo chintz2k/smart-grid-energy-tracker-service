@@ -26,6 +26,7 @@ public class ConsumerProducerLoggerMonitor {
 	private long updateDatabaseTime;
 	private long webRequestsTime;
 	private long overallTime;
+	private int devicesStartedCount;
 	private int devicesUpdatedCount;
 	private int devicesRemovedCount;
 	private int influxMeasurementsCount;
@@ -44,6 +45,7 @@ public class ConsumerProducerLoggerMonitor {
 			long updateDatabaseTime,
 			long webRequestsTime,
 			long overallTime,
+			int devicesStartedCount,
 			int devicesUpdatedCount,
 			int devicesRemovedCount,
 			int influxMeasurementsCount
@@ -57,6 +59,7 @@ public class ConsumerProducerLoggerMonitor {
 		this.updateDatabaseTime = updateDatabaseTime;
 		this.webRequestsTime = webRequestsTime;
 		this.overallTime = overallTime;
+		this.devicesStartedCount = devicesStartedCount;
 		this.devicesUpdatedCount = devicesUpdatedCount;
 		this.devicesRemovedCount = devicesRemovedCount;
 		this.influxMeasurementsCount = influxMeasurementsCount;
@@ -140,6 +143,14 @@ public class ConsumerProducerLoggerMonitor {
 
 	public void setOverallTime(long overallTime) {
 		this.overallTime = overallTime;
+	}
+
+	public int getDevicesStartedCount() {
+		return devicesStartedCount;
+	}
+
+	public void setDevicesStartedCount(int devicesStartedCount) {
+		this.devicesStartedCount = devicesStartedCount;
 	}
 
 	public int getDevicesUpdatedCount() {

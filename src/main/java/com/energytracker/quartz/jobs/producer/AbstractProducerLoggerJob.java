@@ -128,6 +128,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 			removedDeviceIds.add(producer.getDeviceId());
 		}
 		deviceApiClient.setActiveByListAndNoSendEvent(removedDeviceIds, false, "producers");
+		int startedProducersCount = startedProducers.size();
 		long webRequestsForDeviceTime = System.currentTimeMillis() - beforeWebRequestsForDevice;
 		long webRequestsTime = webRequestsTimeForWeather + webRequestsForDeviceTime;
 
@@ -148,6 +149,7 @@ public abstract class AbstractProducerLoggerJob<T extends BaseProducer> implemen
 							updateDatabaseTime,
 							webRequestsTime,
 							overallTime,
+							startedProducersCount,
 							updatedProducersCount,
 							removedProducersCount,
 							measurementsCount

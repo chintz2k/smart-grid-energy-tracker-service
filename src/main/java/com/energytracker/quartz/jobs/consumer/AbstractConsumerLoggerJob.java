@@ -99,6 +99,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 				removedDeviceIds.add(consumer.getDeviceId());
 			}
 			deviceApiClient.setActiveByListAndNoSendEvent(removedDeviceIds, false, "consumers");
+			int startedConsumersCount = startedConsumers.size();
 			long webRequestsTime = System.currentTimeMillis() - beforeWebRequests;
 
 			long beforeUpdateDatabaseTime = System.currentTimeMillis();
@@ -119,6 +120,7 @@ public abstract class AbstractConsumerLoggerJob<T extends BaseConsumer> implemen
 								updateDatabaseTime,
 								webRequestsTime,
 								overallTime,
+								startedConsumersCount,
 								updatedConsumersCount,
 								removedConsumersCount,
 								measurementsCount
