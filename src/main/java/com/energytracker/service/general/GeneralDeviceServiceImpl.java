@@ -34,8 +34,8 @@ public abstract class GeneralDeviceServiceImpl<T extends BaseDevice, R extends J
 
 	@Override
 	@Transactional
-	public void systemSave(T device) {
-		repository.save(device);
+	public T systemSave(T device) {
+		return repository.save(device);
 	}
 
 	@Override

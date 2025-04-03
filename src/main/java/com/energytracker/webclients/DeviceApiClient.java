@@ -1,5 +1,6 @@
 package com.energytracker.webclients;
 
+import com.energytracker.kafka.events.SmartTimeslotTrackerEvent;
 import com.energytracker.security.TokenService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,18 +50,50 @@ public class DeviceApiClient {
 					url,
 					HttpMethod.PUT,
 					requestEntity,
-					new ParameterizedTypeReference<Map<String, String>>() {}
+					new ParameterizedTypeReference<Map<String, String>>() {
+					}
 			);
 		} catch (HttpClientErrorException e) {
-			logger.error("Client-Fehler: {} - {} - {}", e.getStatusCode(), e.getResponseBodyAsString(), url);
+			logger.error("SetActive - Client-Fehler: {} - {} - {}", e.getStatusCode(), e.getResponseBodyAsString(), url);
 		} catch (HttpServerErrorException e) {
-			logger.error("Server-Fehler: {} - {} - {}", e.getStatusCode(), e.getResponseBodyAsString(), url);
+			logger.error("SetActive - Server-Fehler: {} - {} - {}", e.getStatusCode(), e.getResponseBodyAsString(), url);
 		} catch (ResourceAccessException e) {
-			logger.error("Netzwerkproblem oder API nicht erreichbar: {}", e.getMessage());
+			logger.error("SetActive - Netzwerkproblem oder API nicht erreichbar: {}", e.getMessage());
 		} catch (RestClientException e) {
-			logger.error("Fehler bei der Anfrage: {}", e.getMessage());
+			logger.error("SetActive - Fehler bei der Anfrage: {}", e.getMessage());
 		} catch (Exception e) {
-			logger.error("Ein unerwarteter Fehler ist aufgetreten: {}", e.getMessage());
+			logger.error("SetActive - Ein unerwarteter Fehler ist aufgetreten: {}", e.getMessage());
+		}
+	}
+
+	public void updateTimeslotStatus(SmartTimeslotTrackerEvent event) {
+		String url = "http://home-builder-service/api/smartconsumertimeslots/sysupdate";
+		String accessToken = tokenService.getAccessToken();
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setBearerAuth(accessToken);
+		headers.set("Content-Type", "application/json");
+
+		HttpEntity<SmartTimeslotTrackerEvent> requestEntity = new HttpEntity<>(event, headers);
+
+		try {
+			restTemplate.exchange(
+					url,
+					HttpMethod.PUT,
+					requestEntity,
+					new ParameterizedTypeReference<Map<String, String>>() {
+					}
+			);
+		} catch (HttpClientErrorException e) {
+			logger.error("UpdateTimeslotStatus - Client-Fehler: {} - {} - {}", e.getStatusCode(), e.getResponseBodyAsString(), url);
+		} catch (HttpServerErrorException e) {
+			logger.error("UpdateTimeslotStatus - Server-Fehler: {} - {} - {}", e.getStatusCode(), e.getResponseBodyAsString(), url);
+		} catch (ResourceAccessException e) {
+			logger.error("UpdateTimeslotStatus - Netzwerkproblem oder API nicht erreichbar: {}", e.getMessage());
+		} catch (RestClientException e) {
+			logger.error("UpdateTimeslotStatus - Fehler bei der Anfrage: {}", e.getMessage());
+		} catch (Exception e) {
+			logger.error("UpdateTimeslotStatus - Ein unerwarteter Fehler ist aufgetreten: {}", e.getMessage());
 		}
 	}
 }
