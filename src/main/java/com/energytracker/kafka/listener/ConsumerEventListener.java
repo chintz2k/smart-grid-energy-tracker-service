@@ -38,31 +38,44 @@ public class ConsumerEventListener {
 	}
 
 	@KafkaListener(topics = "consumer-events", groupId = "energy-tracker-group")
-	public void processConsumerEvent(String message) throws JsonProcessingException {
-		ConsumerEvent consumerEvent = objectMapper.readValue(message, ConsumerEvent.class);
-		if (consumerEvent.isCommercial()) {
-			if (consumerEvent.isActive()) {
-				CommercialConsumer commercialConsumer = consumerEvent.toCommercialConsumer();
-				commercialConsumerService.add(commercialConsumer);
+	public void processConsumerEvent(@Payload String message) {
+		ConsumerEvent consumerEvent = null;
+		try {
+			consumerEvent = objectMapper.readValue(message, ConsumerEvent.class);
+		} catch (JsonProcessingException e) {
+			logger.error("Error parsing user consumer event. Message: {}", message);
+			logger.error("Error parsing user consumer event. e.getMessage: {}", e.getMessage());
+		}
+		if (consumerEvent != null) {
+			if (consumerEvent.isCommercial()) {
+				if (consumerEvent.isActive()) {
+					CommercialConsumer commercialConsumer = consumerEvent.toCommercialConsumer();
+					commercialConsumerService.add(commercialConsumer);
+				} else {
+					commercialConsumerService.updateEndTime(consumerEvent.getDeviceId(), consumerEvent.getTimestamp());
+				}
 			} else {
-				commercialConsumerService.updateEndTime(consumerEvent.getDeviceId(), consumerEvent.getTimestamp());
-			}
-		} else {
-			if (consumerEvent.isActive()) {
-				Consumer consumer = consumerEvent.toConsumer();
-				consumerService.add(consumer);
-			} else {
-				consumerService.updateEndTime(consumerEvent.getDeviceId(), consumerEvent.getTimestamp());
+				if (consumerEvent.isActive()) {
+					Consumer consumer = consumerEvent.toConsumer();
+					consumerService.add(consumer);
+				} else {
+					consumerService.updateEndTime(consumerEvent.getDeviceId(), consumerEvent.getTimestamp());
+				}
 			}
 		}
 	}
 
 	@KafkaListener(topics = "system-managed-private-consumer-events", groupId = "energy-tracker-group")
-	public void processConsumerEventsFromSystem(@Payload String message) throws JsonProcessingException {
+	public void processConsumerEventsFromSystem(@Payload String message) {
+		List<ConsumerSystemEvent> events = null;
 		try {
-			List<ConsumerSystemEvent> events = objectMapper.readValue(message, new TypeReference<>() {
-			});
+			events = objectMapper.readValue(message, new TypeReference<>() {});
+		} catch (JsonProcessingException e) {
+			logger.error("Error parsing system consumer event. Message: {}", message);
+			logger.error("Error parsing system consumer event. e.getMessage: {}", e.getMessage());
+		}
 
+		if (events != null) {
 			for (ConsumerSystemEvent event : events) {
 				Consumer consumer = new Consumer();
 				consumer.setDeviceId(event.getDeviceId());
@@ -73,9 +86,6 @@ public class ConsumerEventListener {
 
 				consumerService.systemSave(consumer);
 			}
-		} catch (Exception e) {
-			logger.error("Error processing Kafka message: {}", message, e);
-			throw e;
 		}
 	}
 }
